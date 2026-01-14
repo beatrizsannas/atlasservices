@@ -1,0 +1,5 @@
+{
+  "name": "Atlas Services",
+  "description": "A service management dashboard for freelancers featuring daily summaries, monthly progress tracking, and appointment scheduling.",
+  "requestFramePermissions": []
+}
