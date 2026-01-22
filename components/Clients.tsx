@@ -3,7 +3,7 @@ import { supabase } from '../supabaseClient';
 import { useAlert } from '../contexts/AlertContext';
 
 interface ClientsProps {
-  onClientClick: () => void;
+  onClientClick: (id: string) => void;
   onBack: () => void;
   onNewClient?: () => void;
   onEditClient?: (id: string) => void;
@@ -66,110 +66,106 @@ export const Clients: React.FC<ClientsProps> = ({ onClientClick, onBack, onNewCl
   );
 
   return (
-    <div className="flex flex-col h-full bg-background-light">
-      <header className="sticky top-0 z-10 flex items-center justify-between bg-[#0B2A5B] px-4 py-4 text-white shadow-md">
+    <div className="flex flex-col h-full bg-background-light overflow-x-hidden">
+      {/* Header */}
+      <div className="sticky top-0 z-50 bg-background-light/90 backdrop-blur-md px-4 py-3 border-b border-gray-200 flex justify-between items-center relative transition-colors duration-200">
         <button
           onClick={onBack}
-          className="flex items-center justify-center p-2 rounded-full hover:bg-white/10 transition-colors -ml-2"
+          className="flex items-center justify-center h-10 w-10 rounded-full hover:bg-gray-200 transition-colors z-10"
         >
-          <span className="material-symbols-outlined text-[24px]">arrow_back</span>
+          <span className="material-symbols-outlined text-primary">arrow_back</span>
         </button>
-        <h1 className="text-lg font-bold">Clientes</h1>
+        <h1 className="text-xl font-bold text-primary absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">Clientes</h1>
         <button
           onClick={onNewClient}
-          className="flex items-center justify-center p-2 rounded-full hover:bg-white/10 transition-colors -mr-2"
+          className="flex items-center justify-center h-10 w-10 rounded-full hover:bg-gray-200 transition-colors z-10"
         >
-          <span className="material-symbols-outlined text-[24px]">add</span>
+          <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 0, 'wght' 400" }}>add</span>
         </button>
-      </header>
+      </div>
 
-      <div className="px-4 py-4">
-        <div className="relative">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[20px]">search</span>
-          <input
-            type="text"
-            placeholder="Buscar por nome, email ou telefone..."
-            className="w-full pl-10 pr-4 py-3 bg-white rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all shadow-sm"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
+      {/* Search & Filter */}
+      <div className="px-4 py-4 sticky top-[65px] z-40 bg-background-light">
+        <div className="flex gap-3">
+          <div className="relative flex-1 group">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-primary transition-colors">search</span>
+            <input
+              className="w-full pl-10 pr-4 py-3 rounded-[16px] border-none bg-white shadow-sm focus:ring-2 focus:ring-primary/20 focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
+              placeholder="Buscar cliente..."
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+          <button className="bg-white w-[48px] flex items-center justify-center rounded-[16px] shadow-sm text-primary hover:bg-gray-50 active:scale-95 transition-all border border-transparent">
+            <span className="material-symbols-outlined">tune</span>
+          </button>
         </div>
       </div>
 
-      <main className="flex-1 overflow-y-auto px-4 pb-24 flex flex-col gap-3">
+      {/* Overview Card */}
+      <div className="px-4 pb-4">
+        <div className="bg-card-blue p-5 rounded-[20px] shadow-sm flex items-center justify-between border border-transparent">
+          <div className="flex flex-col gap-1">
+            <span className="text-sm font-medium text-primary/70 uppercase tracking-wide">Visão Geral</span>
+            <h2 className="text-2xl font-bold text-primary">Total de Clientes: {loading ? '...' : clients.length}</h2>
+          </div>
+          <div className="bg-white/40 rounded-full p-2.5">
+            <span className="material-symbols-outlined text-primary text-2xl">group</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Client List */}
+      <main className="flex flex-col gap-3 px-4 pb-32">
         {loading ? (
           <div className="flex justify-center py-10">
             <span className="material-symbols-outlined animate-spin text-primary text-3xl">refresh</span>
           </div>
         ) : filteredClients.length > 0 ? (
           filteredClients.map((client) => (
-            <ClientCard
+            <div
               key={client.id}
-              name={client.name}
-              phone={client.phone}
-              email={client.email}
-              onClick={onClientClick}
-              onDelete={(e) => handleDelete(e, client.id)}
-              onEdit={(e) => {
-                e.stopPropagation();
-                if (onEditClient) onEditClient(client.id);
-              }}
-            />
+              onClick={() => onClientClick(client.id)}
+              className="bg-white p-4 rounded-[16px] shadow-sm flex items-center justify-between border border-transparent hover:border-primary/10 transition-all cursor-pointer"
+            >
+              <div className="flex flex-col gap-1">
+                <h2 className="text-base font-semibold text-[#111418]">{client.name}</h2>
+                <div className="flex items-center gap-1.5 text-gray-500">
+                  <span className="material-symbols-outlined text-[16px]">phone_iphone</span>
+                  <span className="text-sm">{client.phone || 'Sem telefone'}</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-2">
+                <span className="bg-sky-blue/20 text-primary text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap">
+                  Serviços: -
+                </span>
+                <div className="flex items-center gap-3 pr-1">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (onEditClient) onEditClient(client.id);
+                    }}
+                    className="text-[#0B2A5B] hover:opacity-80 transition-opacity"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">edit</span>
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(e, client.id)}
+                    className="text-[#8A8F98] hover:opacity-80 transition-opacity"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">delete</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           ))
         ) : (
           <div className="text-center py-10 text-gray-500">
-            {search ? 'Nenhum cliente encontrado para a busca.' : 'Nenhum cliente cadastrado.'}
+            {search ? 'Nenhum cliente encontrado.' : 'Nenhum cliente cadastrado.'}
           </div>
         )}
       </main>
     </div>
   );
 };
-
-interface ClientCardProps {
-  name: string;
-  phone: string;
-  email?: string;
-  onClick: () => void;
-  onDelete: (e: React.MouseEvent) => void;
-  onEdit: (e: React.MouseEvent) => void;
-}
-
-const ClientCard: React.FC<ClientCardProps> = ({ name, phone, email, onClick, onDelete, onEdit }) => (
-  <div
-    onClick={onClick}
-    className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between active:scale-[0.99] transition-all cursor-pointer"
-  >
-    <div className="flex flex-col gap-1">
-      <h3 className="font-bold text-[#111418] text-base">{name}</h3>
-      <div className="flex flex-col gap-0.5">
-        {phone && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <span className="material-symbols-outlined text-[14px]">call</span>
-            {phone}
-          </div>
-        )}
-        {email && (
-          <div className="flex items-center gap-1.5 text-xs text-gray-500">
-            <span className="material-symbols-outlined text-[14px]">mail</span>
-            {email}
-          </div>
-        )}
-      </div>
-    </div>
-    <div className="flex items-center gap-2">
-      <button
-        className="p-2 text-primary hover:bg-blue-50 rounded-lg transition-colors"
-        onClick={onEdit}
-      >
-        <span className="material-symbols-outlined text-[20px]">edit</span>
-      </button>
-      <button
-        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-        onClick={onDelete}
-      >
-        <span className="material-symbols-outlined text-[20px]">delete</span>
-      </button>
-    </div>
-  </div>
-);

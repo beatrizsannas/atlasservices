@@ -70,19 +70,30 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
       if (servicesData) setServices(servicesData);
 
       // Fetch quotes
-      const { data: quotesData } = await supabase.from('quotes').select('id, client_id, total, created_at, clients(name)');
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: quotesData } = await supabase
+        .from('quotes')
+        .select('id, client_id, total, status, created_at, clients(name)')
+        .eq('user_id', user?.id);
       console.log('Quotes loaded:', quotesData);
 
       let formattedQuotes: any[] = [];
       if (quotesData) {
-        console.log('Quote Client IDs:', quotesData.map((q: any) => q.client_id));
-        formattedQuotes = quotesData.map((q: any) => ({
-          id: q.id,
-          title: `Orçamento #${q.id.substr(0, 8)} - ${q.clients?.name}`,
-          client_id: q.client_id,
-          // Store raw quote object if needed or just id
-          original: q
-        }));
+        console.log('Quote Data with Status:', quotesData.map((q: any) => ({ id: q.id, status: q.status })));
+
+        // Filter for approved quotes, case insensitive, and check for 'Aprovado' (user's language) or 'approved'
+        formattedQuotes = quotesData
+          .filter((q: any) => {
+            const s = q.status?.toLowerCase() || '';
+            return s === 'approved' || s === 'aprovado';
+          })
+          .map((q: any) => ({
+            id: q.id,
+            title: `Orçamento #${q.id.substr(0, 8)} - ${q.clients?.name} (${q.total ? `R$ ${q.total}` : '-'})`,
+            client_id: q.client_id,
+            // Store raw quote object if needed or just id
+            original: q
+          }));
         setQuotes(formattedQuotes);
       }
 

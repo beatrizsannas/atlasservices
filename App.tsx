@@ -219,7 +219,10 @@ const App: React.FC = () => {
 
       {currentScreen === 'clients' && (
         <Clients
-          onClientClick={() => handleNavigate('client-details')}
+          onClientClick={(id) => {
+            setCurrentClientId(id);
+            handleNavigate('client-details');
+          }}
           onBack={() => handleNavigate('dashboard')}
           onNewClient={handleNewClient}
           onEditClient={handleEditClient}
@@ -234,7 +237,10 @@ const App: React.FC = () => {
       )}
 
       {currentScreen === 'client-details' && (
-        <ClientDetails onBack={() => handleNavigate('clients')} />
+        <ClientDetails
+          onBack={() => handleNavigate('clients')}
+          clientId={currentClientId}
+        />
       )}
 
       {currentScreen === 'inventory' && (
