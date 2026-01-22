@@ -8,11 +8,12 @@ interface QuotesProps {
   onFilter?: () => void;
   onEditQuote?: (id: string) => void;
   onViewQuote?: (id: string) => void;
+  onScheduleQuote?: (id: string) => void;
 }
 
 // ... imports
 
-export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, onEditQuote, onViewQuote }) => {
+export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, onEditQuote, onViewQuote, onScheduleQuote }) => {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Todos');
@@ -229,6 +230,17 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
                       >
                         <span className="material-symbols-outlined text-[18px]">check_circle</span>
                         Aprovar
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onScheduleQuote) onScheduleQuote(quote.id);
+                          setActiveMenuQuoteId(null);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-purple-50 text-gray-700 hover:text-purple-700 flex items-center gap-3 transition-colors font-medium text-sm"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">event</span>
+                        Agendar
                       </button>
                       <button
                         onClick={(e) => {

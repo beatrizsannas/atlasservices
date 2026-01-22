@@ -201,7 +201,13 @@ const App: React.FC = () => {
       )}
 
       {currentScreen === 'new-appointment' && (
-        <NewAppointment onBack={() => handleNavigate('schedule')} />
+        <NewAppointment
+          onBack={() => {
+            setCurrentQuoteId(null); // Clear quote ID on back
+            handleNavigate('schedule');
+          }}
+          initialQuoteId={currentQuoteId}
+        />
       )}
 
       {currentScreen === 'appointment-details' && (
@@ -256,6 +262,10 @@ const App: React.FC = () => {
           onFilter={() => handleNavigate('advanced-filter')}
           onEditQuote={handleEditQuote}
           onViewQuote={handleViewQuote}
+          onScheduleQuote={(quoteId) => {
+            setCurrentQuoteId(quoteId);
+            handleNavigate('new-appointment');
+          }}
         />
       )}
 

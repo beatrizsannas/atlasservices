@@ -4,9 +4,10 @@ import { useAlert } from '../contexts/AlertContext';
 
 interface NewAppointmentProps {
   onBack: () => void;
+  initialQuoteId?: string | null;
 }
 
-export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
+export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQuoteId }) => {
   const [appointmentType, setAppointmentType] = useState<'service' | 'quote'>('service');
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
@@ -68,15 +69,19 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
       const { data: servicesData } = await supabase.from('services').select('id, title, duration_minutes');
       if (servicesData) setServices(servicesData);
 
-      // Fetch quotes if needed, or fetch on demand
+      // Fetch quotes
       const { data: quotesData } = await supabase.from('quotes').select('id, client_id, total, created_at, clients(name)');
       console.log('Quotes loaded:', quotesData);
+
+      let formattedQuotes: any[] = [];
       if (quotesData) {
-        console.log('Quote Client IDs:', quotesData.map((q: any) => q.client_id)); // Debug log
-        const formattedQuotes = quotesData.map((q: any) => ({
+        console.log('Quote Client IDs:', quotesData.map((q: any) => q.client_id));
+        formattedQuotes = quotesData.map((q: any) => ({
           id: q.id,
           title: `Orçamento #${q.id.substr(0, 8)} - ${q.clients?.name}`,
-          client_id: q.client_id
+          client_id: q.client_id,
+          // Store raw quote object if needed or just id
+          original: q
         }));
         setQuotes(formattedQuotes);
       }
@@ -85,6 +90,36 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
       console.error('Error fetching dependencies:', error);
     }
   };
+
+  useEffect(() => {
+    if (initialQuoteId && quotes.length > 0 && clients.length > 0) {
+      console.log('Attempting to pre-select quote:', initialQuoteId);
+
+      const foundQuote = quotes.find(q => q.id == initialQuoteId);
+      if (foundQuote) {
+        console.log('Found quote to pre-select:', foundQuote);
+
+        // 1. Set Type
+        setAppointmentType('quote');
+
+        // 2. Set Client
+        // Use loose equality for safety
+        const client = clients.find(c => c.id == foundQuote.client_id);
+        if (client) {
+          console.log('Found client for quote:', client);
+          setSelectedClient(client);
+          setClientSearch(client.name);
+        } else {
+          console.warn('Client not found for quote:', foundQuote.client_id);
+        }
+
+        // 3. Set Quote Item
+        setSelectedItem(foundQuote);
+      } else {
+        console.warn('Quote not found with ID:', initialQuoteId);
+      }
+    }
+  }, [initialQuoteId, quotes, clients]);
 
   // ... (rest of code)
 
