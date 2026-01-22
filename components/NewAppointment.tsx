@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface NewAppointmentProps {
   onBack: () => void;
@@ -6,6 +7,20 @@ interface NewAppointmentProps {
 
 export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
   const [appointmentType, setAppointmentType] = useState<'service' | 'quote'>('service');
+  const [loading, setLoading] = useState(false);
+  const [clients, setClients] = useState<any[]>([]);
+  const [services, setServices] = useState<any[]>([]);
+  const [quotes, setQuotes] = useState<any[]>([]);
+
+  // Search state
+  const [clientSearch, setClientSearch] = useState('');
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<any>(null);
+
+  // Form state
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+  const [notes, setNotes] = useState('');
 
   // Calendar States
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -17,17 +32,15 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
 
   // Dropdown State
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [selectedService, setSelectedService] = useState('');
+  const [selectedItem, setSelectedItem] = useState<any>(null); // Service or Quote
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
 
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-  const services = [
-    "Instalação de Ar Condicionado",
-    "Manutenção Preventiva",
-    "Limpeza Química",
-    "Carga de Gás"
-  ];
+  useEffect(() => {
+    fetchDependencies();
+  }, []);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -35,12 +48,84 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
       }
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  const fetchDependencies = async () => {
+    try {
+      const { data: clientsData } = await supabase.from('clients').select('id, name');
+      if (clientsData) setClients(clientsData);
+
+      const { data: servicesData } = await supabase.from('services').select('id, title, duration_minutes');
+      if (servicesData) setServices(servicesData);
+
+      // Fetch quotes if needed, or fetch on demand
+      const { data: quotesData } = await supabase.from('quotes').select('id, client_id, total, created_at, clients(name)'); // rudimentary quote info
+      if (quotesData) {
+        const formattedQuotes = quotesData.map((q: any) => ({
+          id: q.id,
+          title: `Orçamento #${q.id.substr(0, 8)} - ${q.clients?.name}`,
+          client_id: q.client_id
+        }));
+        setQuotes(formattedQuotes);
+      }
+
+    } catch (error) {
+      console.error('Error fetching dependencies:', error);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!selectedClient) {
+      alert('Selecione um cliente.');
+      return;
+    }
+    if (!selectedDate) {
+      alert('Selecione uma data.');
+      return;
+    }
+    if (!startTime || !endTime) {
+      alert('Selecione horário de início e fim.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Combine date and time for timestamps
+      const startDateTime = `${selectedDate}T${startTime}:00`;
+      const endDateTime = `${selectedDate}T${endTime}:00`;
+
+      const { error } = await supabase.from('appointments').insert({
+        user_id: user.id,
+        client_id: selectedClient.id,
+        type: appointmentType, // 'service' or 'quote'
+        related_id: selectedItem?.id || null, // service_id or quote_id
+        start_time: startDateTime,
+        end_time: endDateTime,
+        notes: notes,
+        status: 'scheduled'
+      });
+
+      if (error) throw error;
+      onBack();
+    } catch (error: any) {
+      console.error('Error saving appointment:', error);
+      alert('Erro ao salvar agendamento: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   const openCalendar = () => {
     // Initialize view based on selected date or current date
@@ -107,6 +192,8 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
     return `${d}/${m}/${y}`;
   };
 
+  const filteredClients = clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
+
   return (
     <div className="flex flex-col min-h-screen bg-background-light font-display text-[#111418] antialiased overflow-x-hidden">
       <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto bg-background-light shadow-xl">
@@ -124,15 +211,41 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
 
         <main className="flex-1 flex flex-col gap-5 px-4 py-6 pb-32">
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-5">
-            <div className="flex flex-col gap-2 relative">
+            <div className="flex flex-col gap-2 relative" ref={clientDropdownRef}>
               <label className="text-sm font-semibold text-[#111418]">Cliente</label>
               <div className="relative">
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400 text-[20px]">person_search</span>
                 <input
                   type="text"
                   placeholder="Buscar cliente..."
+                  value={selectedClient ? selectedClient.name : clientSearch}
+                  onChange={(e) => {
+                    setClientSearch(e.target.value);
+                    setSelectedClient(null);
+                    setIsClientDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsClientDropdownOpen(true)}
                   className="w-full bg-gray-50 text-[#111418] placeholder-gray-400 text-sm rounded-xl border-0 ring-1 ring-gray-200 focus:ring-2 focus:ring-primary pl-10 pr-10 py-3.5 transition-all outline-none"
                 />
+                {isClientDropdownOpen && filteredClients.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-30 max-h-48 overflow-y-auto">
+                    {filteredClients.map(client => (
+                      <button
+                        key={client.id}
+                        className="w-full text-left px-4 py-2 text-sm text-[#111418] hover:bg-gray-50 transition-colors"
+                        onClick={() => {
+                          setSelectedClient(client);
+                          setClientSearch(client.name);
+                          setIsClientDropdownOpen(false);
+                          // Filter quotes for this client if type is quote?
+                          // For now, keep it simple
+                        }}
+                      >
+                        {client.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 <button className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 bg-primary/10 rounded-lg text-primary hover:bg-primary/20 transition-colors">
                   <span className="material-symbols-outlined text-[18px]">add</span>
                 </button>
@@ -150,7 +263,7 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
                     checked={appointmentType === 'service'}
                     onChange={() => {
                       setAppointmentType('service');
-                      setSelectedService('');
+                      setSelectedItem(null);
                     }}
                     className="peer sr-only"
                   />
@@ -166,7 +279,7 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
                     checked={appointmentType === 'quote'}
                     onChange={() => {
                       setAppointmentType('quote');
-                      setSelectedService('');
+                      setSelectedItem(null);
                     }}
                     className="peer sr-only"
                   />
@@ -186,8 +299,8 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
                   className="w-full bg-gray-50 text-[#111418] text-sm rounded-xl border-0 ring-1 ring-gray-200 focus:ring-2 focus:ring-primary pl-4 pr-10 py-3.5 cursor-pointer flex items-center justify-between"
                   onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                 >
-                  <span className={!selectedService ? "text-gray-400" : ""}>
-                    {selectedService || (appointmentType === 'service' ? 'Selecione um serviço...' : 'Selecione um orçamento...')}
+                  <span className={!selectedItem ? "text-gray-400" : ""}>
+                    {selectedItem ? (appointmentType === 'service' ? selectedItem.title : selectedItem.title) : (appointmentType === 'service' ? 'Selecione um serviço...' : 'Selecione um orçamento...')}
                   </span>
                   <span className={`material-symbols-outlined text-gray-500 text-[20px] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}>
                     expand_more
@@ -195,19 +308,34 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
                 </div>
 
                 {isDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-30 animate-in fade-in zoom-in-95 duration-100">
-                    {services.map((service, index) => (
-                      <button
-                        key={index}
-                        className="w-full text-left px-4 py-2.5 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
-                        onClick={() => {
-                          setSelectedService(service);
-                          setIsDropdownOpen(false);
-                        }}
-                      >
-                        {service}
-                      </button>
-                    ))}
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-48 overflow-y-auto">
+                    {appointmentType === 'service' ? (
+                      services.map((service) => (
+                        <button
+                          key={service.id}
+                          className="w-full text-left px-4 py-2.5 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                          onClick={() => {
+                            setSelectedItem(service);
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          {service.title} ({service.duration_minutes}m)
+                        </button>
+                      ))
+                    ) : (
+                      quotes.map((quote) => (
+                        <button
+                          key={quote.id}
+                          className="w-full text-left px-4 py-2.5 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                          onClick={() => {
+                            setSelectedItem(quote);
+                            setIsDropdownOpen(false);
+                          }}
+                        >
+                          {quote.title}
+                        </button>
+                      ))
+                    )}
                   </div>
                 )}
               </div>
@@ -241,6 +369,8 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
                   <input
                     className="w-full bg-gray-50 text-[#111418] text-sm rounded-xl border-0 ring-1 ring-gray-200 focus:ring-2 focus:ring-primary pl-10 pr-2 py-3.5 transition-all outline-none appearance-none"
                     type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
                   />
                 </div>
               </div>
@@ -253,6 +383,8 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
                   <input
                     className="w-full bg-gray-50 text-[#111418] text-sm rounded-xl border-0 ring-1 ring-gray-200 focus:ring-2 focus:ring-primary pl-10 pr-2 py-3.5 transition-all outline-none appearance-none"
                     type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
                   />
                 </div>
               </div>
@@ -265,16 +397,23 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
               className="w-full bg-gray-50 text-[#111418] placeholder-gray-400 text-sm rounded-xl border-0 ring-1 ring-gray-200 focus:ring-2 focus:ring-primary p-3.5 transition-all outline-none resize-none"
               placeholder="Adicione detalhes importantes sobre o agendamento..."
               rows={3}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
             ></textarea>
           </div>
         </main>
 
         <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto p-4 bg-background-light/95 backdrop-blur-md z-40 pb-8 safe-area-bottom border-t border-transparent">
           <button
-            onClick={onBack}
-            className="w-full bg-primary hover:bg-[#09224a] text-white font-bold text-base py-4 rounded-xl shadow-lg shadow-primary/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+            onClick={handleSave}
+            disabled={loading}
+            className="w-full bg-primary hover:bg-[#09224a] text-white font-bold text-base py-4 rounded-xl shadow-lg shadow-primary/30 transition-all active:scale-[0.98] flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            Confirmar Agendamento
+            {loading ? (
+              <span className="material-symbols-outlined animate-spin">refresh</span>
+            ) : (
+              'Confirmar Agendamento'
+            )}
           </button>
         </div>
 

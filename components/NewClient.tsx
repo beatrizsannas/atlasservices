@@ -1,10 +1,60 @@
-import React from 'react';
+import React, { useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface NewClientProps {
   onBack: () => void;
 }
 
 export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
+  const [loading, setLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+    notes: ''
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { id, value } = e.target;
+    setFormData(prev => ({ ...prev, [id]: value }));
+  };
+
+  const handleSave = async () => {
+    if (!formData.name.trim()) {
+      alert('Por favor, informe o nome do cliente.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        alert('Você precisa estar logado para realizar esta ação.');
+        return;
+      }
+
+      const { error } = await supabase.from('clients').insert({
+        user_id: user.id,
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email,
+        address: formData.address,
+        notes: formData.notes
+      });
+
+      if (error) throw error;
+
+      onBack();
+    } catch (error: any) {
+      console.error('Erro ao salvar cliente:', error);
+      alert('Erro ao salvar cliente: ' + (error.message || 'Erro desconhecido'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="bg-background-light font-display text-[#111418] overflow-x-hidden min-h-screen flex flex-col">
       <div className="sticky top-0 z-50 bg-[#0B2A5B] px-4 py-4 shadow-md flex justify-between items-center transition-colors duration-200">
@@ -27,6 +77,8 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
               <input
                 className="w-full pl-10 pr-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
                 id="name"
+                value={formData.name}
+                onChange={handleChange}
                 placeholder="Ex: Ana Clara Silva"
                 type="text"
               />
@@ -40,6 +92,8 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
               <input
                 className="w-full pl-10 pr-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
                 id="phone"
+                value={formData.phone}
+                onChange={handleChange}
                 placeholder="(00) 00000-0000"
                 type="tel"
               />
@@ -53,6 +107,8 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
               <input
                 className="w-full pl-10 pr-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
                 id="email"
+                value={formData.email}
+                onChange={handleChange}
                 placeholder="cliente@email.com"
                 type="email"
               />
@@ -66,6 +122,8 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
               <input
                 className="w-full pl-10 pr-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
                 id="address"
+                value={formData.address}
+                onChange={handleChange}
                 placeholder="Rua, Número, Bairro"
                 type="text"
               />
@@ -77,6 +135,8 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
             <textarea
               className="w-full px-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all resize-none text-gray-800"
               id="notes"
+              value={formData.notes}
+              onChange={handleChange}
               placeholder="Adicione notas sobre o cliente..."
               rows={4}
             ></textarea>
@@ -85,11 +145,16 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
 
         <div className="mt-auto pt-6">
           <button
-            onClick={onBack}
-            className="w-full bg-primary text-white font-semibold py-4 rounded-[16px] shadow-md shadow-primary/30 hover:bg-primary/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            onClick={handleSave}
+            disabled={loading}
+            className="w-full bg-primary text-white font-semibold py-4 rounded-[16px] shadow-md shadow-primary/30 hover:bg-primary/90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <span className="material-symbols-outlined">save</span>
-            Salvar Cliente
+            {loading ? (
+              <span className="material-symbols-outlined animate-spin">refresh</span>
+            ) : (
+              <span className="material-symbols-outlined">save</span>
+            )}
+            {loading ? 'Salvando...' : 'Salvar Cliente'}
           </button>
         </div>
       </main>

@@ -1,12 +1,72 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
+
+export interface Service {
+  id: string;
+  title: string;
+  duration_minutes: number;
+  price: number;
+  description: string;
+}
 
 interface ServicesProps {
   onBack: () => void;
   onNewService?: () => void;
-  onEditService?: () => void;
+  onEditService?: (service: Service) => void;
 }
 
 export const Services: React.FC<ServicesProps> = ({ onBack, onNewService, onEditService }) => {
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    fetchServices();
+  }, []);
+
+  const fetchServices = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .order('title');
+
+      if (error) throw error;
+      if (data) setServices(data);
+    } catch (error) {
+      console.error('Error fetching services:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Tem certeza que deseja excluir este serviço?')) return;
+
+    try {
+      const { error } = await supabase.from('services').delete().eq('id', id);
+      if (error) throw error;
+      setServices(prev => prev.filter(s => s.id !== id));
+    } catch (error) {
+      console.error('Error deleting service:', error);
+      alert('Erro ao excluir serviço.');
+    }
+  };
+
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    if (hours > 0 && mins > 0) return `${hours}h${mins}m`;
+    if (hours > 0) return `${hours}h`;
+    return `${mins} min`;
+  };
+
+  const filteredServices = services.filter(service =>
+    service.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="flex flex-col min-h-screen bg-background-light font-display overflow-hidden">
       <header className="flex items-center bg-[#0B2A5B] p-4 pt-5 pb-4 justify-between shrink-0 z-10 shadow-md sticky top-0">
@@ -36,36 +96,30 @@ export const Services: React.FC<ServicesProps> = ({ onBack, onNewService, onEdit
             className="block w-full pl-10 pr-3 py-2.5 border-none rounded-lg leading-5 bg-gray-100 text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-primary sm:text-sm"
             placeholder="Buscar serviços..."
             type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
       </div>
 
       <main className="flex-1 overflow-y-auto no-scrollbar bg-background-light pb-32">
         <div className="flex flex-col gap-3 px-4 mt-4">
-          <ServiceCard
-            title="Manutenção de PC"
-            duration="2h estimadas"
-            price="R$ 150,00"
-            onEdit={onEditService}
-          />
-          <ServiceCard
-            title="Formatação Completa"
-            duration="3h estimadas"
-            price="R$ 100,00"
-            onEdit={onEditService}
-          />
-          <ServiceCard
-            title="Instalação de Rede"
-            duration="4h estimadas"
-            price="R$ 250,00"
-            onEdit={onEditService}
-          />
-          <ServiceCard
-            title="Backup e Cloud"
-            duration="1h estimada"
-            price="R$ 80,00"
-            onEdit={onEditService}
-          />
+          {loading ? (
+            <div className="text-center py-10 text-gray-500">Carregando serviços...</div>
+          ) : filteredServices.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">Nenhum serviço encontrado.</div>
+          ) : (
+            filteredServices.map(service => (
+              <ServiceCard
+                key={service.id}
+                title={service.title}
+                duration={formatDuration(service.duration_minutes)}
+                price={`R$ ${service.price.toFixed(2).replace('.', ',')}`}
+                onEdit={() => onEditService && onEditService(service)}
+                onDelete={(e) => handleDelete(e, service.id)}
+              />
+            ))
+          )}
           <div className="h-20"></div>
         </div>
       </main>
@@ -78,9 +132,10 @@ interface ServiceCardProps {
   duration: string;
   price: string;
   onEdit?: () => void;
+  onDelete?: (e: React.MouseEvent) => void;
 }
 
-const ServiceCard: React.FC<ServiceCardProps> = ({ title, duration, price, onEdit }) => (
+const ServiceCard: React.FC<ServiceCardProps> = ({ title, duration, price, onEdit, onDelete }) => (
   <div className="flex items-center gap-4 bg-white px-4 py-3 rounded-lg shadow-sm border border-gray-100">
     <div className="flex items-center gap-4 flex-1">
       <div className="flex flex-col justify-center">
@@ -100,7 +155,10 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ title, duration, price, onEdi
         >
           <span className="material-symbols-outlined text-[20px]">edit</span>
         </button>
-        <button className="text-gray-400 hover:text-red-500 transition-colors">
+        <button
+          onClick={onDelete}
+          className="text-gray-400 hover:text-red-500 transition-colors"
+        >
           <span className="material-symbols-outlined text-[20px]">delete</span>
         </button>
       </div>

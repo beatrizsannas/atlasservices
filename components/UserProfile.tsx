@@ -1,10 +1,104 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface UserProfileProps {
     onBack: () => void;
 }
 
 export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [email, setEmail] = useState('');
+    const [formData, setFormData] = useState({
+        full_name: '',
+        phone: '',
+        cpf: '',
+        avatar_url: ''
+    });
+
+    useEffect(() => {
+        getProfile();
+    }, []);
+
+    const getProfile = async () => {
+        try {
+            setLoading(true);
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                // handle not logged in
+                setLoading(false);
+                return;
+            }
+
+            setEmail(user.email || '');
+
+            const { data, error } = await supabase
+                .from('profiles')
+                .select('full_name, phone, cpf, avatar_url')
+                .eq('id', user.id)
+                .single();
+
+            if (error && error.code !== 'PGRST116') {
+                console.error('Error fetching profile:', error);
+            }
+
+            if (data) {
+                setFormData({
+                    full_name: data.full_name || '',
+                    phone: data.phone || '',
+                    cpf: data.cpf || '',
+                    avatar_url: data.avatar_url || ''
+                });
+            }
+        } catch (error) {
+            console.error('Error loading user data:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSave = async () => {
+        try {
+            setSaving(true);
+            const { data: { user } } = await supabase.auth.getUser();
+
+            if (!user) {
+                alert('Usuário não autenticado.');
+                return;
+            }
+
+            const updates = {
+                id: user.id,
+                full_name: formData.full_name,
+                phone: formData.phone,
+                cpf: formData.cpf,
+                avatar_url: formData.avatar_url,
+                updated_at: new Date(),
+            };
+
+            const { error } = await supabase.from('profiles').upsert(updates);
+
+            if (error) throw error;
+
+            alert('Perfil atualizado com sucesso!');
+        } catch (error: any) {
+            console.error('Error updating profile:', error);
+            alert('Erro ao atualizar perfil: ' + error.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
+
+    if (loading) {
+        return <div className="flex h-screen items-center justify-center text-[#111418]">Carregando perfil...</div>;
+    }
+
     return (
         <div className="bg-background-light text-[#111418] h-screen flex flex-col overflow-hidden font-display">
             <header className="flex items-center bg-primary p-4 pb-4 justify-between sticky top-0 z-10 shadow-md text-white">
@@ -22,43 +116,79 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
             <main className="flex-1 overflow-y-auto pb-8">
                 <div className="flex flex-col items-center mt-8 mb-6">
                     <div className="relative group cursor-pointer">
+                        {/* Avatar display - placeholder if empty */}
                         <div
-                            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-28 w-28 ring-4 ring-white shadow-md"
-                            style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCyV7Zj8tifxtx0xl51l9npr1RVVLjB53h9j1tykXyly7xc76klWSlDZq-jz8wdFjq639GfTg-GW9kykTrE7CUlfkpzs2bRyb9qaxNg9geALMPvuN8nlLVXTn3p1r_d6cN87cBRrRcMMaCwN5T2KvvHR2BnmdRSyPfYmM-0vOlTIfVyaoSVWxNNBK2hhA_Jqdn8a112iOORgC4t-QuUA295BEBJFri1ljqA1FUdWqOlkClrRuAzJ-z3mpTp70onX8hHaIplkmL9zTPX")' }}
-                        ></div>
+                            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-28 w-28 ring-4 ring-white shadow-md bg-gray-200 flex items-center justify-center"
+                            style={formData.avatar_url ? { backgroundImage: `url("${formData.avatar_url}")` } : {}}
+                        >
+                            {!formData.avatar_url && <span className="material-symbols-outlined text-4xl text-gray-400">person</span>}
+                        </div>
                         <div className="absolute bottom-1 right-1 bg-primary text-white p-2 rounded-full border-2 border-white flex items-center justify-center shadow-sm">
                             <span className="material-symbols-outlined text-sm">edit</span>
                         </div>
                     </div>
-                    <p className="mt-3 text-primary font-semibold text-sm cursor-pointer hover:underline">Alterar foto</p>
+                    {/* Image upload not fully implemented yet, just a button for now */}
+                    <p className="mt-3 text-primary font-semibold text-sm cursor-pointer hover:underline" onClick={() => alert('Funcionalidade de upload de imagem em breve!')}>Alterar foto</p>
                 </div>
 
                 <div className="px-4">
                     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
                         <div className="p-4 border-b border-gray-100">
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Nome Completo</label>
-                            <input className="w-full text-[#111418] font-medium text-base border-none p-0 focus:ring-0 bg-transparent placeholder-gray-400" type="text" defaultValue="Carlos Silva" />
+                            <input
+                                className="w-full text-[#111418] font-medium text-base border-none p-0 focus:ring-0 bg-transparent placeholder-gray-400"
+                                type="text"
+                                name="full_name"
+                                value={formData.full_name}
+                                onChange={handleChange}
+                                placeholder="Seu nome completo"
+                            />
                         </div>
-                        <div className="p-4 border-b border-gray-100">
-                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">E-mail</label>
-                            <input className="w-full text-[#111418] font-medium text-base border-none p-0 focus:ring-0 bg-transparent placeholder-gray-400" type="email" defaultValue="carlos.silva@freelancer.com" />
+                        <div className="p-4 border-b border-gray-100 opacity-60 bg-gray-50">
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">E-mail (não editável)</label>
+                            <input
+                                className="w-full text-[#111418] font-medium text-base border-none p-0 focus:ring-0 bg-transparent placeholder-gray-400 cursor-not-allowed"
+                                type="email"
+                                value={email}
+                                disabled
+                            />
                         </div>
                         <div className="p-4 border-b border-gray-100">
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Telefone</label>
-                            <input className="w-full text-[#111418] font-medium text-base border-none p-0 focus:ring-0 bg-transparent placeholder-gray-400" type="tel" defaultValue="(11) 98765-4321" />
+                            <input
+                                className="w-full text-[#111418] font-medium text-base border-none p-0 focus:ring-0 bg-transparent placeholder-gray-400"
+                                type="tel"
+                                name="phone"
+                                value={formData.phone}
+                                onChange={handleChange}
+                                placeholder="(00) 00000-0000"
+                            />
                         </div>
                         <div className="p-4">
                             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">CPF</label>
-                            <input className="w-full text-[#111418] font-medium text-base border-none p-0 focus:ring-0 bg-transparent placeholder-gray-400" type="text" defaultValue="123.456.789-00" />
+                            <input
+                                className="w-full text-[#111418] font-medium text-base border-none p-0 focus:ring-0 bg-transparent placeholder-gray-400"
+                                type="text"
+                                name="cpf"
+                                value={formData.cpf}
+                                onChange={handleChange}
+                                placeholder="000.000.000-00"
+                            />
                         </div>
                     </div>
 
                     <div className="mt-8 mb-6">
                         <button
-                            onClick={onBack}
-                            className="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:bg-[#0d346b] active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                            onClick={handleSave}
+                            disabled={saving}
+                            className="w-full bg-primary text-white font-bold py-4 rounded-xl shadow-lg hover:bg-[#0d346b] active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                         >
-                            <span>Salvar Alterações</span>
+                            {saving ? (
+                                <span className="material-symbols-outlined animate-spin">refresh</span>
+                            ) : (
+                                <span className="material-symbols-outlined">save</span>
+                            )}
+                            <span>{saving ? 'Salvando...' : 'Salvar Alterações'}</span>
                         </button>
                     </div>
                 </div>

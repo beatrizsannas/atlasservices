@@ -24,7 +24,7 @@ import { CompanyDetails } from './components/CompanyDetails';
 import { UserProfile } from './components/UserProfile';
 import { NewAppointment } from './components/NewAppointment';
 import { NewClient } from './components/NewClient';
-import { Services } from './components/Services';
+import { Services, Service } from './components/Services';
 import { NewService } from './components/NewService';
 import { EditService } from './components/EditService';
 import { AppointmentDetails } from './components/AppointmentDetails';
@@ -49,7 +49,9 @@ export default function App() {
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [quoteValidityDate, setQuoteValidityDate] = useState('2023-11-24');
+  const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
 
   const isAuthScreen = currentScreen === 'login' || currentScreen === 'signup' || currentScreen === 'forgot-password' || currentScreen === 'email-sent-success' || currentScreen === 'email-sent-error' || currentScreen === 'new-password' || currentScreen === 'welcome' || currentScreen === 'signup-success' || currentScreen === 'reschedule';
 
@@ -219,8 +221,9 @@ export default function App() {
       {currentScreen === 'new-quote' && (
         <NewQuote
           onBack={() => handleNavigate('quotes')}
-          onGenerate={(date) => {
+          onGenerate={(date: string, quoteId?: string) => {
             setQuoteValidityDate(date);
+            if (quoteId) setCurrentQuoteId(quoteId);
             handleNavigate('view-quote');
           }}
           onAdd={() => handleNavigate('quote-add-item')}
@@ -250,6 +253,7 @@ export default function App() {
         <ViewQuote
           onBack={() => handleNavigate('new-quote')}
           validityDate={quoteValidityDate}
+          quoteId={currentQuoteId || undefined}
         />
       )}
 
@@ -264,7 +268,10 @@ export default function App() {
         <Services
           onBack={() => handleNavigate('dashboard')}
           onNewService={() => handleNavigate('new-service')}
-          onEditService={() => handleNavigate('edit-service')}
+          onEditService={(service) => {
+            setServiceToEdit(service);
+            handleNavigate('edit-service');
+          }}
         />
       )}
 
@@ -273,7 +280,13 @@ export default function App() {
       )}
 
       {currentScreen === 'edit-service' && (
-        <EditService onBack={() => handleNavigate('services')} />
+        <EditService
+          onBack={() => {
+            setServiceToEdit(null);
+            handleNavigate('services');
+          }}
+          service={serviceToEdit}
+        />
       )}
 
       {currentScreen === 'finance' && (

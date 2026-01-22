@@ -1,4 +1,5 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface ScheduleProps {
   onNewAppointment?: () => void;
@@ -10,13 +11,144 @@ interface ScheduleProps {
 export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointmentClick, onReschedule, onBack }) => {
   const [activeTab, setActiveTab] = useState('Hoje');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   // State for date inputs
-  const [startDate, setStartDate] = useState('2023-10-12');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
 
   const startDateInputRef = useRef<HTMLInputElement>(null);
   const endDateInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetchAppointments();
+  }, [activeTab, startDate, endDate]);
+
+  const fetchAppointments = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      let query = supabase
+        .from('appointments')
+        .select(`
+                id,
+                start_time,
+                end_time,
+                status,
+                type,
+                related_id,
+                notes,
+                clients (name, avatar_url),
+                services (title)
+            `)
+        .eq('user_id', user.id)
+        .order('start_time', { ascending: true });
+
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+      if (activeTab === 'Hoje') {
+        query = query
+          .gte('start_time', startOfDay.toISOString())
+          .lt('start_time', endOfDay.toISOString());
+      } else if (activeTab === 'Semana') {
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+        query = query
+          .gte('start_time', startOfWeek.toISOString())
+          .lt('start_time', endOfWeek.toISOString());
+      } else if (activeTab === 'Mês') {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+
+        query = query
+          .gte('start_time', startOfMonth.toISOString())
+          .lt('start_time', endOfMonth.toISOString());
+      } else if (activeTab === 'Outro' && startDate && endDate) {
+        // For 'Outro', we might not want to query immediately until applied? 
+        // But here we rely on state. If activeTab is Outro, startDate and endDate should be used.
+        // We'll require user to hit "Apply" which probably updates startDate/endDate state or just `fetchAppointments` call.
+        // But here useEffect dependencies include them. Let's assume startDate/endDate are set by filter.
+        query = query
+          .gte('start_time', `${startDate}T00:00:00`)
+          .lt('start_time', `${endDate}T23:59:59`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        console.error('Error fetching appointments:', error);
+      } else {
+        // Process data for display
+        // We need to fetch quotes titles if type is quote?
+        // The query above joins services. If type is quote, we don't have title.
+        // We can fetch quotes separately or use a separate query.
+        // For simplicity, let's fetch quotes ids and titles if there are any quote type appointments.
+
+        const appointmentList = await Promise.all(data.map(async (app: any) => {
+          let title = 'Agendamento';
+          if (app.type === 'service' && app.services) {
+            title = app.services.title;
+          } else if (app.type === 'quote') {
+            // Fetch quote title
+            // Optimization: Bulk fetch quotes? Or just one by one for now (less complex).
+            const { data: quote } = await supabase.from('quotes').select('id').eq('id', app.related_id).single();
+            if (quote) {
+              title = `Orçamento #${quote.id.substr(0, 8)}`;
+            } else {
+              title = 'Orçamento';
+            }
+          }
+
+          // Parse time
+          const start = new Date(app.start_time);
+          const end = new Date(app.end_time);
+          const timeString = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')} - ${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
+
+          return {
+            id: app.id,
+            status: app.status === 'scheduled' ? 'Agendado' : (app.status === 'completed' ? 'Concluído' : 'Cancelado'),
+            statusColor: app.status === 'scheduled' ? 'bg-blue-50 text-primary ring-blue-700/10' : (app.status === 'completed' ? 'bg-teal-50 text-teal-700 ring-teal-700/10' : 'bg-gray-100 text-gray-600 ring-gray-500/10'),
+            dotColor: app.status === 'scheduled' ? 'bg-primary' : undefined,
+            iconStatus: app.status === 'completed' ? 'check' : (app.status === 'cancelled' ? 'close' : undefined),
+            time: timeString,
+            title: title,
+            personName: app.clients?.name || 'Cliente desconhecido',
+            personImage: app.clients?.avatar_url,
+            initials: app.clients?.name ? app.clients.name.substring(0, 2).toUpperCase() : '??',
+            isCancelled: app.status === 'cancelled',
+            isOpacityReduced: app.status === 'completed',
+            date: start, // for grouping
+            rawStatus: app.status // for actions
+          };
+        }));
+
+        setAppointments(appointmentList);
+      }
+    } catch (error) {
+      console.error('Error loading appointments:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    try {
+      const { error } = await supabase.from('appointments').update({ status: newStatus }).eq('id', id);
+      if (error) throw error;
+      fetchAppointments(); // Refresh
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Erro ao atualizar status.');
+    }
+  };
 
   const showDatePicker = (ref: React.RefObject<HTMLInputElement>) => {
     if (ref.current) {
@@ -33,14 +165,29 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
 
   const closeFilter = () => {
     setIsFilterOpen(false);
-    // Optionally reset tab to 'Hoje' or keep 'Outro' selected visually
   };
+
+  const applyFilter = () => {
+    // Trigger fetch by changing state or just calling fetch (fetch depends on startDate/endDate)
+    fetchAppointments();
+    closeFilter();
+  }
 
   const formatDate = (dateString: string) => {
     if (!dateString) return '';
     const [year, month, day] = dateString.split('-');
     return `${day}/${month}/${year}`;
   };
+
+  // Group appointments by day
+  const groupedAppointments = appointments.reduce((groups: any, appointment: any) => {
+    const dateKey = appointment.date.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' });
+    if (!groups[dateKey]) {
+      groups[dateKey] = [];
+    }
+    groups[dateKey].push(appointment);
+    return groups;
+  }, {});
 
   return (
     <div className="flex flex-col min-h-screen pb-32 bg-background-light relative">
@@ -77,72 +224,41 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
       </div>
 
       <main className="flex-1 flex flex-col gap-8 px-4 pt-6 pb-24">
-        {/* Today Section */}
-        <div>
-          <div className="flex items-center gap-2 py-2 mb-3">
-            <span className="material-symbols-outlined text-[#637188] text-sm">event</span>
-            <h4 className="text-[#637188] text-sm font-bold uppercase tracking-wider">Hoje, 12 de Outubro</h4>
-          </div>
-
-          <AppointmentCard
-            status="Agendado"
-            statusColor="bg-blue-50 text-primary ring-blue-700/10"
-            dotColor="bg-primary"
-            time="09:00 - 10:00"
-            title="Consultoria de Marketing"
-            personName="Ana Silva"
-            personImage="https://lh3.googleusercontent.com/aida-public/AB6AXuAXaNc2ARxJ6KvD7LGucVUekfTg9nWW4BrQXNKYa318d9QFeZ9xr2bg6qf1S7mkUn5b-8Ii5JWUJ1NKXnVvpwPYpPgpL9Mw8FGQ6i_61hAV_W4e7bsu6vxbEEy6naFbgvdZDz1SA7J0cQlIc9K92_AdifW0A5IrUtnz-hQ6WV9LEC9Fk6fbpo2s_wmONDOQKTkYxIZVpow9hinJ8hO-RXoQBsK7G4vIMxw6pvcG8_Wh1GzCDx0PaQFhDWxObFIgaIF87iz8mdDR4wwG"
-            onDetailsClick={onAppointmentClick}
-            onReschedule={onReschedule}
-          />
-
-          <AppointmentCard
-            status="Concluído"
-            statusColor="bg-teal-50 text-teal-700 ring-teal-700/10"
-            iconStatus="check"
-            time="14:00 - 15:30"
-            title="Fotografia de Produto"
-            personName="Tech Solutions"
-            initials="TS"
-            isOpacityReduced
-            onDetailsClick={onAppointmentClick}
-            onReschedule={onReschedule}
-          />
-        </div>
-
-        {/* Tomorrow Section */}
-        <div>
-          <div className="flex items-center gap-2 py-2 mb-3 mt-4">
-            <span className="material-symbols-outlined text-[#637188] text-sm">calendar_today</span>
-            <h4 className="text-[#637188] text-sm font-bold uppercase tracking-wider">Amanhã, 13 de Outubro</h4>
-          </div>
-
-          <AppointmentCard
-            status="Cancelado"
-            statusColor="bg-gray-100 text-gray-600 ring-gray-500/10"
-            iconStatus="close"
-            time="08:00 - 09:00"
-            title="Reunião de Briefing"
-            personName="Julia Mendes"
-            personImage="https://lh3.googleusercontent.com/aida-public/AB6AXuAlBSMwLnNVj4FlYICIv-B1MDmenMwNmkI08WgsWPM8Oi5PkkfCUtX4zBDLHXsGlCYwH3XberTbNcS6SsgFLjADoBqR3jg_ZVxYYTOEWvtB7JF-DTWgN_LysBB9QN12t1-4xTnxlrCPyuruZLre0LHizdHCu0zQExk6XfK-qHR3AXkpogxuLzVeKL8RfuhlWQCJwvUXXE6J7SOHNrnY3wfjGyBpO-ZA1F_Osq9nCd128Q5r-J_-9n0Zs0ZCkTsATAgX0QImsGnbQS0a"
-            isCancelled
-            onDetailsClick={onAppointmentClick}
-            onReschedule={onReschedule}
-          />
-
-          <AppointmentCard
-            status="Agendado"
-            statusColor="bg-blue-50 text-primary ring-blue-700/10"
-            dotColor="bg-primary"
-            time="10:30 - 12:00"
-            title="Edição de Vídeo"
-            personName="Canal TechDaily"
-            initials="YT"
-            initialsColor="bg-orange-100 text-orange-600"
-            onDetailsClick={onAppointmentClick}
-            onReschedule={onReschedule}
-          />
-        </div>
+        {loading ? (
+          <div className="text-center py-10 text-gray-500">Carregando agendamentos...</div>
+        ) : Object.keys(groupedAppointments).length === 0 ? (
+          <div className="text-center py-10 text-gray-500">Nenhum agendamento encontrado para este período.</div>
+        ) : (
+          Object.keys(groupedAppointments).map((dateKey) => (
+            <div key={dateKey}>
+              <div className="flex items-center gap-2 py-2 mb-3">
+                <span className="material-symbols-outlined text-[#637188] text-sm">event</span>
+                <h4 className="text-[#637188] text-sm font-bold uppercase tracking-wider capitalize">{dateKey}</h4>
+              </div>
+              {groupedAppointments[dateKey].map((app: any) => (
+                <AppointmentCard
+                  key={app.id}
+                  id={app.id}
+                  status={app.status}
+                  statusColor={app.statusColor}
+                  dotColor={app.dotColor}
+                  iconStatus={app.iconStatus}
+                  time={app.time}
+                  title={app.title}
+                  personName={app.personName}
+                  personImage={app.personImage}
+                  initials={app.initials}
+                  isOpacityReduced={app.isOpacityReduced}
+                  isCancelled={app.isCancelled}
+                  rawStatus={app.rawStatus}
+                  onDetailsClick={onAppointmentClick}
+                  onReschedule={onReschedule}
+                  onUpdateStatus={handleUpdateStatus}
+                />
+              ))}
+            </div>
+          ))
+        )}
       </main>
 
       {/* Filter Modal */}
@@ -211,8 +327,8 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
             </div>
 
             <button
-              onClick={closeFilter}
-              className="w-full bg-[#0b2a5b] hover:bg-[#092248] text-white font-bold text-base py-4 rounded-xl shadow-lg shadow-blue-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              onClick={applyFilter}
+              className="w-full bg-[#0b2a5b] hover:bg-[#09224a] text-white font-bold text-base py-4 rounded-xl shadow-lg shadow-blue-900/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
             >
               <span>Aplicar Filtro</span>
             </button>
@@ -243,6 +359,7 @@ const TabButton: React.FC<{ label: string; active?: boolean; onClick: () => void
 );
 
 interface AppointmentCardProps {
+  id: string; // Add ID
   status: string;
   statusColor: string;
   dotColor?: string;
@@ -255,12 +372,14 @@ interface AppointmentCardProps {
   initialsColor?: string;
   isOpacityReduced?: boolean;
   isCancelled?: boolean;
+  rawStatus: string; // Add raw status for logic
   onDetailsClick?: () => void;
   onReschedule?: () => void;
+  onUpdateStatus: (id: string, newStatus: string) => void; // Add update handler
 }
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
-  status, statusColor, dotColor, iconStatus, time, title, personName, personImage, initials, initialsColor, isOpacityReduced, isCancelled, onDetailsClick, onReschedule
+  id, status, statusColor, dotColor, iconStatus, time, title, personName, personImage, initials, initialsColor, isOpacityReduced, isCancelled, rawStatus, onDetailsClick, onReschedule, onUpdateStatus
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -277,11 +396,20 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           <>
             <div className="fixed inset-0 z-10" onClick={() => setIsMenuOpen(false)}></div>
             <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden z-30 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-              <button className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors">
-                <span className="material-symbols-outlined text-gray-400 text-[20px]">check_circle</span>
-                Serviço Concluído
-              </button>
-              <button
+              {rawStatus !== 'completed' && rawStatus !== 'cancelled' && (
+                <button
+                  className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                  onClick={() => {
+                    onUpdateStatus(id, 'completed');
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-gray-400 text-[20px]">check_circle</span>
+                  Serviço Concluído
+                </button>
+              )}
+              {/* Reschedule might be just another editing action, but for now just call prop */}
+              {/* <button
                 onClick={() => {
                   setIsMenuOpen(false);
                   onReschedule?.();
@@ -290,11 +418,19 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
               >
                 <span className="material-symbols-outlined text-gray-400 text-[20px]">edit_calendar</span>
                 Reagendar
-              </button>
-              <button className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors border-t border-gray-50">
-                <span className="material-symbols-outlined text-[20px]">cancel</span>
-                Cancelar
-              </button>
+              </button> */}
+              {rawStatus !== 'cancelled' && (
+                <button
+                  className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors border-t border-gray-50"
+                  onClick={() => {
+                    onUpdateStatus(id, 'cancelled');
+                    setIsMenuOpen(false);
+                  }}
+                >
+                  <span className="material-symbols-outlined text-[20px]">cancel</span>
+                  Cancelar
+                </button>
+              )}
             </div>
           </>
         )}

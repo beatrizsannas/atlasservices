@@ -1,19 +1,66 @@
 import React, { useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface NewTransactionProps {
   onBack: () => void;
+  onSave?: () => void;
 }
 
-export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack }) => {
+export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack, onSave }) => {
+  const [loading, setLoading] = useState(false);
   const [transactionType, setTransactionType] = useState<'income' | 'expense'>('income');
-  const [amount, setAmount] = useState('');
+  const [formData, setFormData] = useState({
+    amount: '',
+    title: '',
+    date: new Date().toISOString().split('T')[0],
+    category: '',
+    notes: ''
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
 
   const handleAmountBlur = () => {
-    if (amount) {
-      const num = parseFloat(amount);
+    if (formData.amount) {
+      const num = parseFloat(formData.amount);
       if (!isNaN(num)) {
-        setAmount(num.toFixed(2));
+        setFormData(prev => ({ ...prev, amount: num.toFixed(2) }));
       }
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formData.amount || !formData.title || !formData.category || !formData.date) {
+      alert('Por favor, preencha valor, título, data e categoria.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('Usuário não autenticado');
+
+      const { error } = await supabase.from('transactions').insert({
+        user_id: user.id,
+        type: transactionType,
+        amount: parseFloat(formData.amount),
+        title: formData.title,
+        date: formData.date,
+        category: formData.category,
+        notes: formData.notes
+      });
+
+      if (error) throw error;
+
+      if (onSave) onSave();
+      onBack();
+    } catch (error: any) {
+      console.error('Error saving transaction:', error);
+      alert('Erro ao salvar transação.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -79,8 +126,9 @@ export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack }) => {
                 placeholder="0.00"
                 type="number"
                 step="0.01"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
+                name="amount"
+                value={formData.amount}
+                onChange={handleChange}
                 onBlur={handleAmountBlur}
               />
             </div>
@@ -93,22 +141,36 @@ export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack }) => {
                 className="w-full bg-transparent border-none p-0 text-base font-semibold text-[#111418] focus:ring-0 placeholder-gray-400"
                 placeholder={transactionType === 'income' ? "Ex: Venda de Peça" : "Ex: Compra de Material"}
                 type="text"
+                name="title"
+                value={formData.title}
+                onChange={handleChange}
               />
             </div>
 
             <div className="p-4 flex items-center justify-between group hover:bg-gray-50 transition-colors cursor-pointer relative">
               <div className="flex-1 pointer-events-none">
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">Data</label>
-                <div className="text-base font-semibold text-[#111418]">24 de Outubro, 2023</div>
+                <div className="text-base font-semibold text-[#111418]">{formData.date || 'Selecionar Data'}</div>
               </div>
-              <input className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10" type="date" />
+              <input
+                className="absolute inset-0 opacity-0 w-full h-full cursor-pointer z-10"
+                type="date"
+                name="date"
+                value={formData.date}
+                onChange={handleChange}
+              />
               <span className="material-symbols-outlined text-gray-400 group-hover:text-primary transition-colors">calendar_month</span>
             </div>
 
             <div className="p-4 flex items-center justify-between hover:bg-gray-50 transition-colors relative">
               <div className="flex-1 min-w-0">
                 <label className="block text-xs font-semibold text-gray-500 mb-1.5">Categoria</label>
-                <select className="w-full bg-transparent border-none p-0 text-base font-semibold text-[#111418] focus:ring-0 appearance-none cursor-pointer">
+                <select
+                  className="w-full bg-transparent border-none p-0 text-base font-semibold text-[#111418] focus:ring-0 appearance-none cursor-pointer"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                >
                   <option disabled value="">Selecione</option>
                   {transactionType === 'income' ? (
                     <>
@@ -137,6 +199,9 @@ export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack }) => {
               className="w-full bg-gray-50 rounded-xl border-none p-3 text-sm text-[#111418] focus:ring-2 focus:ring-primary/20 resize-none placeholder-gray-400"
               placeholder="Adicione detalhes, número de nota fiscal, ou informações do cliente..."
               rows={3}
+              name="notes"
+              value={formData.notes}
+              onChange={handleChange}
             ></textarea>
           </div>
         </form>
@@ -144,11 +209,16 @@ export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack }) => {
 
       <div className="sticky bottom-0 left-0 w-full bg-white border-t border-gray-200 p-4 pb-8 z-40 safe-area-bottom">
         <button
-          onClick={onBack}
-          className="w-full bg-[#0B2A5B] hover:bg-[#0B2A5B]/90 text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-[#0B2A5B]/20 flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
+          onClick={handleSave}
+          disabled={loading}
+          className="w-full bg-[#0B2A5B] hover:bg-[#0B2A5B]/90 text-white font-bold text-lg py-4 rounded-xl shadow-lg shadow-[#0B2A5B]/20 flex items-center justify-center gap-2 transition-transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed"
         >
-          <span className="material-symbols-outlined">save</span>
-          Salvar Transação
+          {loading ? (
+            <span className="material-symbols-outlined animate-spin">refresh</span>
+          ) : (
+            <span className="material-symbols-outlined">save</span>
+          )}
+          <span>{loading ? 'Salvando...' : 'Salvar Transação'}</span>
         </button>
       </div>
     </div>

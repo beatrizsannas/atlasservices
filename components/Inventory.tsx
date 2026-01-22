@@ -1,11 +1,66 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface InventoryProps {
   onBack: () => void;
   onNewPart?: () => void;
 }
 
+interface Part {
+  id: string;
+  name: string;
+  category: string;
+  quantity: number;
+  min_stock: number;
+  cost_price: number;
+  sale_price: number;
+}
+
 export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart }) => {
+  const [parts, setParts] = useState<Part[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState('Todos');
+
+  useEffect(() => {
+    fetchParts();
+  }, []);
+
+  const fetchParts = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('inventory_parts')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      if (data) setParts(data);
+    } catch (error) {
+      console.error('Error fetching parts:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const getStatus = (quantity: number, minStock: number) => {
+    if (quantity === 0) return { label: 'Esgotado', color: 'text-red-600', dot: 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]', bg: 'bg-red-50 text-red-600 border border-red-100' };
+    if (quantity <= minStock) return { label: 'Baixo', color: 'text-orange-600', dot: 'bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]', bg: 'bg-orange-50 text-orange-600 border border-orange-100' };
+    return { label: 'Bom', color: 'text-green-600', dot: 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]', bg: 'bg-gray-100 text-gray-600' };
+  };
+
+  const filteredParts = parts.filter(part => {
+    const matchesSearch = part.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      part.category?.toLowerCase().includes(searchTerm.toLowerCase());
+
+    let matchesFilter = true;
+    if (filter === 'Em Estoque') matchesFilter = part.quantity > 0;
+    if (filter === 'Abaixo do Mínimo') matchesFilter = part.quantity <= part.min_stock;
+    if (filter === 'Crítico') matchesFilter = part.quantity === 0;
+
+    return matchesSearch && matchesFilter;
+  });
+
   return (
     <div className="flex flex-col min-h-screen pb-32 bg-background-light">
       {/* Header - Blue background as per design */}
@@ -37,80 +92,55 @@ export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart }) => {
             className="w-full bg-white text-sm text-gray-700 placeholder-gray-400 rounded-xl border-none shadow-sm py-3 pl-10 pr-4 focus:ring-2 focus:ring-primary/50 transition-all"
             placeholder="Buscar peças, categorias..."
             type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
         {/* Filters */}
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
-          <FilterButton label="Tudo" active />
-          <FilterButton label="Em Estoque" />
-          <FilterButton label="Abaixo do Mínimo" />
-          <FilterButton label="Crítico" />
+          <FilterButton label="Todos" active={filter === 'Todos'} onClick={() => setFilter('Todos')} />
+          <FilterButton label="Em Estoque" active={filter === 'Em Estoque'} onClick={() => setFilter('Em Estoque')} />
+          <FilterButton label="Abaixo do Mínimo" active={filter === 'Abaixo do Mínimo'} onClick={() => setFilter('Abaixo do Mínimo')} />
+          <FilterButton label="Crítico" active={filter === 'Crítico'} onClick={() => setFilter('Crítico')} />
         </div>
 
         {/* List */}
         <div className="flex flex-col gap-4">
-          <InventoryCard
-            icon="cable"
-            name="Cabo HDMI 2m"
-            category="Acessórios"
-            quantity={15}
-            status="Bom"
-            statusColor="text-green-600"
-            dotColor="bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"
-            qtyBg="bg-gray-100 text-gray-600"
-          />
-          <InventoryCard
-            icon="power"
-            name="Fonte ATX 500W"
-            category="Componentes"
-            quantity={3}
-            status="Baixo"
-            statusColor="text-red-600"
-            dotColor="bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]"
-            qtyBg="bg-red-50 text-red-600 border border-red-100"
-          />
-          <InventoryCard
-            icon="hard_drive"
-            name="SSD 240GB Kingston"
-            category="Armazenamento"
-            quantity={8}
-            status="Médio"
-            statusColor="text-orange-600"
-            dotColor="bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]"
-            qtyBg="bg-orange-50 text-orange-600 border border-orange-100"
-          />
-          <InventoryCard
-            icon="memory"
-            name="Memória RAM 8GB"
-            category="Componentes"
-            quantity={12}
-            status="Bom"
-            statusColor="text-green-600"
-            dotColor="bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]"
-            qtyBg="bg-gray-100 text-gray-600"
-          />
-          <InventoryCard
-            icon="format_paint"
-            name="Pasta Térmica"
-            category="Insumos"
-            quantity={5}
-            status="Médio"
-            statusColor="text-orange-600"
-            dotColor="bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.4)]"
-            qtyBg="bg-orange-50 text-orange-600 border border-orange-100"
-          />
+          {loading ? (
+            <div className="text-center py-10 text-gray-500">Carregando estoque...</div>
+          ) : filteredParts.length === 0 ? (
+            <div className="text-center py-10 text-gray-500">Nenhum item encontrado.</div>
+          ) : (
+            filteredParts.map(part => {
+              const status = getStatus(part.quantity, part.min_stock);
+              return (
+                <InventoryCard
+                  key={part.id}
+                  icon="inventory_2"
+                  name={part.name}
+                  category={part.category || 'Geral'}
+                  quantity={part.quantity}
+                  status={status.label}
+                  statusColor={status.color}
+                  dotColor={status.dot}
+                  qtyBg={status.bg}
+                />
+              );
+            })
+          )}
         </div>
       </main>
     </div>
   );
 };
 
-const FilterButton: React.FC<{ label: string; active?: boolean }> = ({ label, active }) => (
+const FilterButton: React.FC<{ label: string; active?: boolean; onClick: () => void }> = ({ label, active, onClick }) => (
   <button
+    onClick={onClick}
     className={`flex-none px-4 py-2 rounded-full text-xs font-medium shadow-sm whitespace-nowrap transition-all active:scale-95 ${active
-        ? 'bg-primary text-white font-semibold'
-        : 'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50'
+      ? 'bg-primary text-white font-semibold'
+      : 'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50'
       }`}
   >
     {label}

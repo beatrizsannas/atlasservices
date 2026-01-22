@@ -1,10 +1,38 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface HeaderProps {
   onProfileClick: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
+  const [userName, setUserName] = useState('Usuário');
+  const [avatarUrl, setAvatarUrl] = useState('');
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const fetchProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // Fetch profile
+      const { data, error } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
+
+      if (data) {
+        const firstName = data.full_name ? data.full_name.split(' ')[0] : 'Usuário';
+        setUserName(firstName);
+        if (data.avatar_url) setAvatarUrl(data.avatar_url);
+      } else if (error && error.code !== 'PGRST116') { // Allow 406 (none found)
+        console.error('Error fetching header profile', error);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  }
+
   return (
     <div className="sticky top-0 z-50 bg-background-light/90 backdrop-blur-md px-4 py-3 border-b border-gray-200 flex justify-between items-center transition-colors duration-200">
       <div className="flex items-center gap-3">
@@ -18,13 +46,15 @@ export const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
 
         <div
           onClick={onProfileClick}
-          className="h-10 w-10 rounded-full bg-cover bg-center border-2 border-white shadow-sm cursor-pointer hover:opacity-80 transition-opacity"
-          style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAV-TgHwClQjQE4-PusmBFfOT0WrXzYMhQ3WVNOlkvadY8aclH8kiSiUz1NNuvjiTv9HwWSWx0YMGeFH8uBHKjbWUxlzaBdkjyb2FBP3MZdd45YOrByKxpvK_BLWO11Z8GnmzId8ZkkL5sv9OlAHuGALUg_eKAe3xgip20rZKbqNvSsp5Xfdwgdvibj7tM1gNFrH4suuu9bayiIhYNHG-FXC5XsWQzX5zi7v0aJ7KRY_ETz8rvp4oMngkO_dzyvfhqrvIp_ccevOoQU")' }}
+          className="h-10 w-10 rounded-full bg-cover bg-center border-2 border-white shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-gray-200"
+          style={{ backgroundImage: avatarUrl ? `url("${avatarUrl}")` : undefined }}
           aria-label="Open sidebar"
-        />
+        >
+          {!avatarUrl && <span className="flex w-full h-full items-center justify-center text-gray-400 material-symbols-outlined text-sm">person</span>}
+        </div>
         <div onClick={onProfileClick} className="cursor-pointer">
           <h1 className="text-sm font-medium text-gray-500">Atlas Services</h1>
-          <h2 className="text-primary font-bold text-lg leading-none">Olá, João</h2>
+          <h2 className="text-primary font-bold text-lg leading-none">Olá, {userName}</h2>
         </div>
       </div>
       <button className="flex items-center justify-center h-10 w-10 rounded-full hover:bg-gray-200 transition-colors">

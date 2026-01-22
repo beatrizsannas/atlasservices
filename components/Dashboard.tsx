@@ -1,26 +1,138 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Screen } from '../App';
+import { supabase } from '../supabaseClient';
 
 interface DashboardProps {
   onNavigate: (screen: Screen) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+  const [scheduledCount, setScheduledCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
+  const [agendaItems, setAgendaItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const now = new Date();
+      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+
+      // 1. Daily Summary: Scheduled Today
+      const { count: scheduledToday } = await supabase
+        .from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .gte('start_time', startOfDay)
+        .lt('start_time', endOfDay)
+        .eq('status', 'scheduled');
+
+      setScheduledCount(scheduledToday || 0);
+
+      // 2. Monthly Summary: Completed This Month (using as proxy for "Services Completed" for now, or could vary logic)
+      // Original UI said "45 Services completed". Let's count completed this MONTH for the big number, or total historical?
+      // Let's assume the "Completed" card refers to COMPLETED THIS MONTH.
+      const { count: completedMonth } = await supabase
+        .from('appointments')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        //.gte('start_time', startOfMonth) // Maybe total completed ever is better? Original design was generic. 
+        // Let's stick to Monthly for likely expectation.
+        .gte('start_time', startOfMonth)
+        .lt('start_time', endOfMonth)
+        .eq('status', 'completed');
+
+      setCompletedCount(completedMonth || 0);
+
+      // 3. Agenda: Today's Appointments
+      const { data: agendaData } = await supabase
+        .from('appointments')
+        .select(`
+                id,
+                start_time,
+                status,
+                type,
+                related_id,
+                clients (name),
+                services (title)
+            `)
+        .eq('user_id', user.id)
+        .gte('start_time', startOfDay)
+        .lt('start_time', endOfDay)
+        .order('start_time', { ascending: true })
+        .limit(5);
+
+      if (agendaData) {
+        const items = await Promise.all(agendaData.map(async (app: any) => {
+          let serviceName = 'Serviço';
+          if (app.type === 'service' && app.services) {
+            serviceName = app.services.title;
+          } else if (app.type === 'quote') {
+            serviceName = 'Orçamento';
+          }
+
+          let statusLabel = 'Agendado';
+          let statusColor = 'bg-sky-blue/10 text-primary border-sky-blue/20';
+          if (app.status === 'completed') {
+            statusLabel = 'Concluído';
+            statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+          } else if (app.status === 'cancelled') {
+            statusLabel = 'Cancelado';
+            statusColor = 'bg-red-50 text-red-700 border-red-100';
+          }
+
+          return {
+            id: app.id,
+            time: new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            client: app.clients?.name || 'Cliente',
+            service: serviceName,
+            status: statusLabel,
+            statusColor: statusColor
+          }
+        }));
+        setAgendaItems(items);
+      }
+
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+
   return (
     <>
-      <DailySummary />
+      <DailySummary date={today} scheduled={scheduledCount} completed={completedCount} />
       <MonthlyProgress onNavigate={onNavigate} />
-      <DailyAgenda />
+      <DailyAgenda date={today} items={agendaItems} loading={loading} />
     </>
   );
 };
 
-const DailySummary: React.FC = () => {
+interface DailySummaryProps {
+  date: string;
+  scheduled: number;
+  completed: number;
+}
+
+const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed }) => {
   return (
     <section>
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-lg font-bold text-[#111418]">Resumo do dia</h3>
-        <span className="text-sm text-gray-500">24 Out</span>
+        <span className="text-sm text-gray-500">{date}</span>
       </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
@@ -28,10 +140,11 @@ const DailySummary: React.FC = () => {
             <div className="p-2 bg-primary/10 rounded-lg">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '20px' }}>calendar_month</span>
             </div>
-            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+2 hoje</span>
+            {/* Trend could be calculated if we compare to yesterday, static for now or remove if no data */}
+            {/* <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+2 hoje</span> */}
           </div>
           <div>
-            <p className="text-3xl font-bold text-[#111418]">12</p>
+            <p className="text-3xl font-bold text-[#111418]">{scheduled}</p>
             <p className="text-sm font-medium text-gray-500 leading-tight mt-1">Serviços agendados</p>
           </div>
         </div>
@@ -40,11 +153,11 @@ const DailySummary: React.FC = () => {
             <div className="p-2 bg-sky-blue/20 rounded-lg">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '20px' }}>check_circle</span>
             </div>
-            <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+5% mês</span>
+            {/* <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+5% mês</span> */}
           </div>
           <div>
-            <p className="text-3xl font-bold text-[#111418]">45</p>
-            <p className="text-sm font-medium text-gray-500 leading-tight mt-1">Serviços realizados</p>
+            <p className="text-3xl font-bold text-[#111418]">{completed}</p>
+            <p className="text-sm font-medium text-gray-500 leading-tight mt-1">Realizados (Mês)</p>
           </div>
         </div>
       </div>
@@ -53,26 +166,30 @@ const DailySummary: React.FC = () => {
 };
 
 const MonthlyProgress: React.FC<{ onNavigate: (screen: Screen) => void }> = ({ onNavigate }) => {
+  // Static for now, hard to chart with just simple data. 
+  // Ideally fetch aggregates. Leaving static structure but user should know it requires more complex queries for real bars.
   return (
     <section className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
       <div className="flex justify-between items-start mb-6">
         <div>
           <h3 className="text-base font-bold text-[#111418]">Progresso Mensal</h3>
-          <p className="text-xs text-gray-500 mt-1">Total de 57 serviços</p>
+          <p className="text-xs text-gray-500 mt-1">Visualização Geral</p>
         </div>
         <button
-          onClick={() => onNavigate('monthly-progress')}
+          onClick={() => onNavigate('finance')} // Redirecting to Finance or Monthly Progress screen
           className="text-primary text-sm font-medium hover:underline"
         >
           Ver tudo
         </button>
       </div>
-      <div className="h-48 w-full flex items-end justify-between gap-3 px-2">
+      <div className="h-48 w-full flex items-end justify-between gap-3 px-2 opacity-50 pointer-events-none grayscale">
+        {/* Placeholder bars to show UI structure until we implement aggregation */}
         <Bar height="h-24" color="bg-sky-blue/30" value="24" label="Jan" />
         <Bar height="h-32" color="bg-sky-blue/50" value="32" label="Fev" />
         <Bar height="h-20" color="bg-sky-blue/80" value="20" label="Mar" />
         <Bar height="h-40" color="bg-primary" value="45" label="Abr" isHighlighted />
       </div>
+      <div className="text-center text-xs text-gray-400 mt-2 italic">Dados do gráfico em desenvolvimento</div>
     </section>
   );
 };
@@ -90,35 +207,36 @@ const Bar: React.FC<{ height: string; color: string; value: string; label: strin
   </div>
 );
 
-const DailyAgenda: React.FC = () => {
+interface DailyAgendaProps {
+  date: string;
+  items: any[];
+  loading: boolean;
+}
+
+const DailyAgenda: React.FC<DailyAgendaProps> = ({ date, items, loading }) => {
   return (
     <section className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
       <div className="flex justify-between items-center mb-4">
         <h3 className="text-base font-bold text-[#111418]">Agenda do Dia</h3>
-        <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded">24 Out</span>
+        <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded capitalize">{date}</span>
       </div>
       <div className="flex flex-col gap-3">
-        <AgendaItem
-          time="09:00"
-          client="Roberto Silva"
-          service="Manutenção de Ar"
-          status="Em breve"
-          statusColor="bg-amber-50 text-amber-700 border-amber-100"
-        />
-        <AgendaItem
-          time="14:30"
-          client="Ana Costa"
-          service="Instalação Elétrica"
-          status="Agendado"
-          statusColor="bg-sky-blue/10 text-primary border-sky-blue/20"
-        />
-        <AgendaItem
-          time="16:00"
-          client="Carlos Mendes"
-          service="Orçamento"
-          status="Pendente"
-          statusColor="bg-gray-50 text-gray-600 border-gray-100"
-        />
+        {loading ? (
+          <div className="text-center text-sm text-gray-400 py-4">Carregando...</div>
+        ) : items.length === 0 ? (
+          <div className="text-center text-sm text-gray-400 py-4">Nenhum agendamento para hoje.</div>
+        ) : (
+          items.map(item => (
+            <AgendaItem
+              key={item.id}
+              time={item.time}
+              client={item.client}
+              service={item.service}
+              status={item.status}
+              statusColor={item.statusColor}
+            />
+          ))
+        )}
       </div>
     </section>
   );

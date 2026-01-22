@@ -1,12 +1,73 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface FinanceProps {
   onBack: () => void;
   onNewTransaction: () => void;
 }
 
+interface Transaction {
+  id: string;
+  type: 'income' | 'expense';
+  title: string;
+  amount: number;
+  date: string;
+  category: string;
+  notes: string;
+}
+
 export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) => {
-  const [activeFilter, setActiveFilter] = useState('Hoje');
+  const [activeFilter, setActiveFilter] = useState('Todos');
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTransactions();
+  }, [activeFilter]);
+
+  const fetchTransactions = async () => {
+    try {
+      setLoading(true);
+
+      let query = supabase
+        .from('transactions')
+        .select('*')
+        .order('date', { ascending: false });
+
+      // Apply date filters if needed based on activeFilter
+      const today = new Date();
+      if (activeFilter === 'Hoje') {
+        query = query.eq('date', today.toISOString().split('T')[0]);
+      } else if (activeFilter === 'Semana') {
+        const lastWeek = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
+        query = query.gte('date', lastWeek.toISOString().split('T')[0]);
+      } else if (activeFilter === 'Mês') {
+        const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        query = query.gte('date', firstDayOfMonth.toISOString().split('T')[0]);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+      if (data) setTransactions(data);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calculateTotals = () => {
+    const income = transactions
+      .filter(t => t.type === 'income')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const expense = transactions
+      .filter(t => t.type === 'expense')
+      .reduce((sum, t) => sum + t.amount, 0);
+    return { income, expense, total: income - expense };
+  };
+
+  const { income, expense, total } = calculateTotals();
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light font-display text-[#111418] pb-32">
@@ -36,7 +97,7 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
         <section>
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <p className="text-sm font-medium text-gray-500 mb-1">Saldo Total</p>
-            <h2 className="text-4xl font-bold text-[#111418] mb-6">R$ 12.450,00</h2>
+            <h2 className="text-4xl font-bold text-[#111418] mb-6">R$ {total.toFixed(2).replace('.', ',')}</h2>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100">
                 <div className="flex items-center gap-2 mb-2">
@@ -45,7 +106,7 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
                   </div>
                   <span className="text-xs font-semibold text-emerald-700">Entradas</span>
                 </div>
-                <p className="text-lg font-bold text-emerald-700">R$ 4.280,00</p>
+                <p className="text-lg font-bold text-emerald-700">R$ {income.toFixed(2).replace('.', ',')}</p>
               </div>
               <div className="bg-red-50 p-4 rounded-xl border border-red-100">
                 <div className="flex items-center gap-2 mb-2">
@@ -54,7 +115,7 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
                   </div>
                   <span className="text-xs font-semibold text-red-700">Saídas</span>
                 </div>
-                <p className="text-lg font-bold text-red-700">R$ 1.150,00</p>
+                <p className="text-lg font-bold text-red-700">R$ {expense.toFixed(2).replace('.', ',')}</p>
               </div>
             </div>
           </div>
@@ -62,10 +123,10 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
 
         {/* Filters */}
         <section className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          <FilterButton label="Todos" active={activeFilter === 'Todos'} onClick={() => setActiveFilter('Todos')} />
           <FilterButton label="Hoje" active={activeFilter === 'Hoje'} onClick={() => setActiveFilter('Hoje')} />
           <FilterButton label="Semana" active={activeFilter === 'Semana'} onClick={() => setActiveFilter('Semana')} />
           <FilterButton label="Mês" active={activeFilter === 'Mês'} onClick={() => setActiveFilter('Mês')} />
-          <FilterButton label="Outro" active={activeFilter === 'Outro'} onClick={() => setActiveFilter('Outro')} />
         </section>
 
         {/* Cash Flow List */}
@@ -78,51 +139,24 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
             </button>
           </div>
           <div className="flex flex-col gap-3">
-            <TransactionItem
-              icon="computer"
-              title="Manutenção de PC"
-              date="Hoje, 14:30"
-              amount="+ R$ 350,00"
-              type="income"
-              iconBg="bg-sky-blue/20"
-              iconColor="text-primary"
-            />
-            <TransactionItem
-              icon="shopping_cart"
-              title="Compra de Cabos"
-              date="Ontem, 09:15"
-              amount="- R$ 120,00"
-              type="expense"
-              iconBg="bg-red-100"
-              iconColor="text-red-600"
-            />
-            <TransactionItem
-              icon="wifi"
-              title="Configuração de Rede"
-              date="22 Out, 16:00"
-              amount="+ R$ 450,00"
-              type="income"
-              iconBg="bg-sky-blue/20"
-              iconColor="text-primary"
-            />
-            <TransactionItem
-              icon="settings_suggest"
-              title="Formatação Notebook"
-              date="21 Out, 11:30"
-              amount="+ R$ 180,00"
-              type="income"
-              iconBg="bg-sky-blue/20"
-              iconColor="text-primary"
-            />
-            <TransactionItem
-              icon="local_gas_station"
-              title="Combustível"
-              date="20 Out, 18:20"
-              amount="- R$ 250,00"
-              type="expense"
-              iconBg="bg-red-100"
-              iconColor="text-red-600"
-            />
+            {loading ? (
+              <div className="text-center py-10 text-gray-500">Carregando transações...</div>
+            ) : transactions.length === 0 ? (
+              <div className="text-center py-10 text-gray-500">Nenhuma transação encontrada.</div>
+            ) : (
+              transactions.map(transaction => (
+                <TransactionItem
+                  key={transaction.id}
+                  icon={transaction.type === 'income' ? (transaction.category === 'service' ? 'computer' : 'attach_money') : 'shopping_cart'} // Simplified icon logic
+                  title={transaction.title}
+                  date={new Date(transaction.date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  amount={`${transaction.type === 'income' ? '+' : '-'} R$ ${transaction.amount.toFixed(2).replace('.', ',')}`}
+                  type={transaction.type}
+                  iconBg={transaction.type === 'income' ? "bg-sky-blue/20" : "bg-red-100"}
+                  iconColor={transaction.type === 'income' ? "text-primary" : "text-red-600"}
+                />
+              ))
+            )}
           </div>
         </section>
       </main>
@@ -134,8 +168,8 @@ const FilterButton: React.FC<{ label: string; active?: boolean; onClick: () => v
   <button
     onClick={onClick}
     className={`px-5 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${active
-        ? 'bg-primary text-white font-semibold shadow-sm shadow-primary/30'
-        : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
+      ? 'bg-primary text-white font-semibold shadow-sm shadow-primary/30'
+      : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
       }`}
   >
     {label}

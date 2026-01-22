@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface ClientsProps {
   onClientClick: () => void;
@@ -6,7 +7,60 @@ interface ClientsProps {
   onNewClient?: () => void;
 }
 
+interface Client {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
+  address: string;
+}
+
 export const Clients: React.FC<ClientsProps> = ({ onClientClick, onBack, onNewClient }) => {
+  const [clients, setClients] = useState<Client[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  useEffect(() => {
+    fetchClients();
+  }, []);
+
+  const fetchClients = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .order('name');
+
+      if (error) throw error;
+      if (data) setClients(data);
+    } catch (error) {
+      console.error('Error fetching clients:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Tem certeza que deseja excluir este cliente?')) return;
+
+    try {
+      const { error } = await supabase.from('clients').delete().eq('id', id);
+      if (error) throw error;
+      setClients(prev => prev.filter(c => c.id !== id));
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      alert('Erro ao excluir cliente.');
+    }
+  };
+
+  const filteredClients = clients.filter(client =>
+    client.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    client.phone?.includes(searchTerm) ||
+    client.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   return (
     <div className="flex flex-col min-h-screen pb-32 bg-background-light">
       {/* Header & Search Combined Sticky Container */}
@@ -37,11 +91,10 @@ export const Clients: React.FC<ClientsProps> = ({ onClientClick, onBack, onNewCl
                 className="w-full pl-10 pr-4 py-3 rounded-[16px] border-none bg-white shadow-sm focus:ring-2 focus:ring-primary/20 focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
                 placeholder="Buscar cliente..."
                 type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
               />
             </div>
-            <button className="bg-white w-[48px] flex items-center justify-center rounded-[16px] shadow-sm text-primary hover:bg-gray-50 active:scale-95 transition-all border border-transparent">
-              <span className="material-symbols-outlined">tune</span>
-            </button>
           </div>
         </div>
       </div>
@@ -51,7 +104,7 @@ export const Clients: React.FC<ClientsProps> = ({ onClientClick, onBack, onNewCl
         <div className="bg-card-blue p-5 rounded-[20px] shadow-sm flex items-center justify-between border border-transparent">
           <div className="flex flex-col gap-1 flex-1 min-w-0 pr-2">
             <span className="text-sm font-medium text-primary/70 uppercase tracking-wide">Visão Geral</span>
-            <h2 className="text-2xl font-bold text-primary leading-tight break-words">Total de Clientes: 124</h2>
+            <h2 className="text-2xl font-bold text-primary leading-tight break-words">Total de Clientes: {loading ? '...' : clients.length}</h2>
           </div>
           <div className="bg-white/40 rounded-full p-3 shrink-0">
             <span className="material-symbols-outlined text-primary text-2xl">group</span>
@@ -61,12 +114,21 @@ export const Clients: React.FC<ClientsProps> = ({ onClientClick, onBack, onNewCl
 
       {/* Client List */}
       <main className="flex flex-col gap-3 px-4 pb-6">
-        <ClientCard name="Ana Clara Silva" phone="(11) 98765-4321" serviceCount={8} onClick={onClientClick} />
-        <ClientCard name="Carlos Eduardo" phone="(21) 99888-7777" serviceCount={3} onClick={onClientClick} />
-        <ClientCard name="Fernanda Oliveira" phone="(31) 97654-3210" serviceCount={12} onClick={onClientClick} />
-        <ClientCard name="João Pedro Santos" phone="(41) 96543-2109" serviceCount={1} onClick={onClientClick} />
-        <ClientCard name="Mariana Costa" phone="(51) 95432-1098" serviceCount={5} onClick={onClientClick} />
-        <ClientCard name="Rafael Souza" phone="(61) 94321-0987" serviceCount={9} onClick={onClientClick} />
+        {loading ? (
+          <div className="text-center py-10 text-gray-500">Carregando clientes...</div>
+        ) : filteredClients.length === 0 ? (
+          <div className="text-center py-10 text-gray-500">Nenhum cliente encontrado.</div>
+        ) : (
+          filteredClients.map(client => (
+            <ClientCard
+              key={client.id}
+              name={client.name}
+              phone={client.phone}
+              onClick={onClientClick}
+              onDelete={(e) => handleDelete(e, client.id)}
+            />
+          ))
+        )}
       </main>
     </div>
   );
@@ -75,11 +137,11 @@ export const Clients: React.FC<ClientsProps> = ({ onClientClick, onBack, onNewCl
 interface ClientCardProps {
   name: string;
   phone: string;
-  serviceCount: number;
   onClick: () => void;
+  onDelete: (e: React.MouseEvent) => void;
 }
 
-const ClientCard: React.FC<ClientCardProps> = ({ name, phone, serviceCount, onClick }) => (
+const ClientCard: React.FC<ClientCardProps> = ({ name, phone, onClick, onDelete }) => (
   <div
     onClick={onClick}
     className="bg-white p-4 rounded-[16px] shadow-sm flex items-center justify-between border border-transparent hover:border-primary/10 transition-all cursor-pointer group"
@@ -88,24 +150,21 @@ const ClientCard: React.FC<ClientCardProps> = ({ name, phone, serviceCount, onCl
       <h2 className="text-base font-semibold text-[#111418]">{name}</h2>
       <div className="flex items-center gap-1.5 text-gray-500">
         <span className="material-symbols-outlined text-[16px]">phone_iphone</span>
-        <span className="text-sm">{phone}</span>
+        <span className="text-sm">{phone || 'Sem telefone'}</span>
       </div>
     </div>
 
     <div className="flex flex-col items-end gap-2">
-      <span className="bg-sky-blue/20 text-primary text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap">
-        Serviços: {serviceCount}
-      </span>
       <div className="flex items-center gap-3 pr-1">
         <button
           className="text-[#0B2A5B] hover:opacity-80 transition-opacity p-1"
-          onClick={(e) => { e.stopPropagation(); }}
+          onClick={(e) => { e.stopPropagation(); /* Placeholder for edit */ }}
         >
           <span className="material-symbols-outlined text-[20px]">edit</span>
         </button>
         <button
           className="text-[#8A8F98] hover:opacity-80 transition-opacity p-1"
-          onClick={(e) => { e.stopPropagation(); }}
+          onClick={onDelete}
         >
           <span className="material-symbols-outlined text-[20px]">delete</span>
         </button>

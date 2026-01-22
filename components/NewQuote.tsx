@@ -1,17 +1,92 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface NewQuoteProps {
   onBack: () => void;
-  onGenerate: (date: string) => void;
-  onAddItem: () => void; // Keep for compatibility if needed, though UI has its own button
+  onGenerate: (date: string, quoteId?: string) => void;
+  onAdd: () => void; // Deprecated/unused in new modal flow but kept for prop signature
 }
 
 export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
-  // Mock initial state for items based on the design
-  const [items, setItems] = useState([
-    { id: 1, name: 'Manutenção de Ar Condicionado', type: 'Serviço • 12.000 BTU', quantity: 1, price: 250.00 },
-    { id: 2, name: 'Gás Refrigerante R410A', type: 'Peça • Kg', quantity: 2, price: 180.00 }
-  ]);
+  const [items, setItems] = useState<any[]>([]);
+  const [clients, setClients] = useState<any[]>([]);
+  const [selectedClientId, setSelectedClientId] = useState('');
+  const [validityDate, setValidityDate] = useState('2023-11-24');
+  const [loading, setLoading] = useState(false);
+  const [fetchingDeps, setFetchingDeps] = useState(true);
+
+  // Add Item Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalTab, setModalTab] = useState<'service' | 'part' | 'custom'>('service');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+
+  // Dependencies data
+  const [servicesList, setServicesList] = useState<any[]>([]);
+  const [partsList, setPartsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchDependencies();
+  }, []);
+
+  useEffect(() => {
+    if (isModalOpen) {
+      filterResults();
+    }
+  }, [modalTab, searchQuery, servicesList, partsList, isModalOpen]);
+
+  const fetchDependencies = async () => {
+    try {
+      const { data: clientsData } = await supabase.from('clients').select('id, name');
+      if (clientsData) setClients(clientsData);
+
+      const { data: servicesData } = await supabase.from('services').select('id, title, price, description');
+      if (servicesData) setServicesList(servicesData);
+
+      const { data: partsData } = await supabase.from('inventory_parts').select('id, name, sale_price, category');
+      if (partsData) setPartsList(partsData);
+
+      setFetchingDeps(false);
+    } catch (error) {
+      console.error('Error fetching deps', error);
+    }
+  }
+
+  const filterResults = () => {
+    if (modalTab === 'service') {
+      setSearchResults(servicesList.filter(s => s.title.toLowerCase().includes(searchQuery.toLowerCase())));
+    } else if (modalTab === 'part') {
+      setSearchResults(partsList.filter(p => p.name.toLowerCase().includes(searchQuery.toLowerCase())));
+    } else {
+      setSearchResults([]);
+    }
+  }
+
+  const addItem = (item: any, type: 'service' | 'part' | 'custom') => {
+    const newItem = {
+      id: Date.now(), // temporary UI ID
+      original_id: item.id || null, // DB ID if service/part
+      name: modalTab === 'custom' ? item.name : (modalTab === 'service' ? item.title : item.name),
+      type: modalTab === 'custom' ? 'Personalizado' : (modalTab === 'service' ? 'Serviço' : 'Peça'),
+      origin: type,
+      quantity: 1,
+      price: modalTab === 'custom' ? parseFloat(item.price) : (modalTab === 'service' ? item.price : item.sale_price)
+    };
+    setItems(prev => [...prev, newItem]);
+    setIsModalOpen(false);
+    setSearchQuery('');
+  }
+
+  const handleCustomAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const name = (form.elements.namedItem('customName') as HTMLInputElement).value;
+    const price = (form.elements.namedItem('customPrice') as HTMLInputElement).value;
+
+    if (name && price) {
+      addItem({ name, price }, 'custom');
+    }
+  }
 
   const handleQuantityChange = (id: number, delta: number) => {
     setItems(prev => prev.map(item => {
@@ -24,7 +99,6 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
   };
 
   const handlePriceChange = (id: number, newPrice: string) => {
-    // Simple price update logic (in a real app, strict masking would be good)
     const numericPrice = parseFloat(newPrice.replace(',', '.'));
     if (!isNaN(numericPrice)) {
       setItems(prev => prev.map(item => item.id === id ? { ...item, price: numericPrice } : item));
@@ -36,12 +110,79 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
   };
 
   const subtotal = items.reduce((acc, item) => acc + (item.quantity * item.price), 0);
-  const discount = 0;
-  const total = subtotal - discount;
+  // Discount State
+  const [discount, setDiscount] = useState(0);
+  const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
+  const [tempDiscount, setTempDiscount] = useState('');
+
+  const total = Math.max(0, subtotal - discount);
+
+  const openDiscountModal = () => {
+    setTempDiscount(discount.toString());
+    setIsDiscountModalOpen(true);
+  }
+
+  const applyDiscount = () => {
+    const val = parseFloat(tempDiscount.replace(',', '.'));
+    if (!isNaN(val) && val >= 0) {
+      setDiscount(val);
+    }
+    setIsDiscountModalOpen(false);
+  }
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+
+  const handleSave = async () => {
+    if (!selectedClientId) {
+      alert('Selecione um cliente.');
+      return;
+    }
+    if (items.length === 0) {
+      alert('Adicione pelo menos um item.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 1. Create Quote
+      const { data: quoteData, error: quoteError } = await supabase.from('quotes').insert({
+        user_id: user.id,
+        client_id: selectedClientId,
+        valid_until: validityDate,
+        total_amount: total,
+        discount: discount,
+        status: 'pending' // or draft
+      }).select().single();
+
+      if (quoteError) throw quoteError;
+
+      // 2. Create Quote Items
+      const quoteItems = items.map(item => ({
+        quote_id: quoteData.id,
+        item_type: item.origin, // service, part, custom
+        description: item.name,
+        quantity: item.quantity,
+        unit_price: item.price
+      }));
+
+      const { error: itemsError } = await supabase.from('quote_items').insert(quoteItems);
+
+      if (itemsError) throw itemsError;
+
+      onGenerate(validityDate, quoteData.id); // Or navigate to view-quote with ID
+
+    } catch (error: any) {
+      console.error('Error saving quote:', error);
+      alert('Erro ao salvar orçamento: ' + error.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light font-display text-[#111418] overflow-x-hidden pb-32">
@@ -65,11 +206,15 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <span className="material-symbols-outlined text-gray-400 text-[20px]">search</span>
               </div>
-              <select className="block w-full pl-10 pr-10 py-3 border-gray-200 rounded-lg bg-gray-50 focus:ring-[#0B2A5B] focus:border-[#0B2A5B] appearance-none text-sm outline-none">
-                <option disabled selected value="">Buscar cliente...</option>
-                <option value="1">Roberto Silva</option>
-                <option value="2">Ana Costa</option>
-                <option value="3">Carlos Mendes</option>
+              <select
+                className="block w-full pl-10 pr-10 py-3 border-gray-200 rounded-lg bg-gray-50 focus:ring-[#0B2A5B] focus:border-[#0B2A5B] appearance-none text-sm outline-none"
+                value={selectedClientId}
+                onChange={(e) => setSelectedClientId(e.target.value)}
+              >
+                <option disabled value="">Buscar cliente...</option>
+                {clients.map(client => (
+                  <option key={client.id} value={client.id}>{client.name}</option>
+                ))}
               </select>
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                 <span className="material-symbols-outlined text-gray-400 text-[20px]">arrow_drop_down</span>
@@ -82,7 +227,8 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
               <input
                 className="block w-full px-3 py-3 border-gray-200 rounded-lg bg-gray-50 focus:ring-[#0B2A5B] focus:border-[#0B2A5B] text-sm outline-none"
                 type="date"
-                defaultValue="2023-11-24"
+                value={validityDate}
+                onChange={(e) => setValidityDate(e.target.value)}
               />
             </div>
           </div>
@@ -142,7 +288,10 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
             </div>
           ))}
 
-          <button className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-[#0B2A5B]/30 rounded-xl text-[#0B2A5B] font-medium hover:bg-[#0B2A5B]/5 transition-colors">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 w-full py-3 border-2 border-dashed border-[#0B2A5B]/30 rounded-xl text-[#0B2A5B] font-medium hover:bg-[#0B2A5B]/5 transition-colors"
+          >
             <span className="material-symbols-outlined text-[20px]">add_circle</span>
             Adicionar Item
           </button>
@@ -157,10 +306,13 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
             </div>
             <div className="flex justify-between items-center text-sm">
               <span className="text-gray-500">Desconto</span>
-              <div className="flex items-center gap-2">
+              <button
+                onClick={openDiscountModal}
+                className="flex items-center gap-2 hover:bg-gray-100 p-1 rounded transition-colors"
+              >
                 <span className="material-symbols-outlined text-gray-400 text-[16px]">edit</span>
                 <span className="font-medium text-emerald-600">- R$ {formatCurrency(discount)}</span>
-              </div>
+              </button>
             </div>
           </div>
           <div className="flex justify-between items-center mb-6">
@@ -168,14 +320,133 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
             <span className="text-xl font-bold text-[#0B2A5B]">R$ {formatCurrency(total)}</span>
           </div>
           <button
-            onClick={() => onGenerate(new Date().toISOString())}
-            className="w-full bg-[#0B2A5B] hover:bg-[#09224a] text-white font-bold py-4 rounded-xl shadow-lg shadow-[#0B2A5B]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+            onClick={handleSave}
+            disabled={loading}
+            className="w-full bg-[#0B2A5B] hover:bg-[#09224a] text-white font-bold py-4 rounded-xl shadow-lg shadow-[#0B2A5B]/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            <span className="material-symbols-outlined">description</span>
-            Gerar Orçamento
+            {loading ? <span className="material-symbols-outlined animate-spin">refresh</span> : <span className="material-symbols-outlined">description</span>}
+            {loading ? 'Salvando...' : 'Gerar Orçamento'}
           </button>
         </section>
       </main>
+
+      {/* Add Item Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6 bg-black/50 backdrop-blur-sm transition-opacity">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-[#0B2A5B] text-white">
+              <h3 className="font-bold text-lg">Adicionar Item</h3>
+              <button onClick={() => setIsModalOpen(false)} className="hover:bg-white/10 p-1 rounded-full"><span className="material-symbols-outlined">close</span></button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex p-2 gap-2 bg-gray-50 border-b border-gray-100">
+              <button
+                onClick={() => setModalTab('service')}
+                className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors ${modalTab === 'service' ? 'bg-[#0B2A5B] text-white' : 'text-gray-500 hover:bg-gray-200'}`}
+              >Serviços</button>
+              <button
+                onClick={() => setModalTab('part')}
+                className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors ${modalTab === 'part' ? 'bg-[#0B2A5B] text-white' : 'text-gray-500 hover:bg-gray-200'}`}
+              >Peças</button>
+              <button
+                onClick={() => setModalTab('custom')}
+                className={`flex-1 py-2 text-xs font-bold uppercase rounded-lg transition-colors ${modalTab === 'custom' ? 'bg-[#0B2A5B] text-white' : 'text-gray-500 hover:bg-gray-200'}`}
+              >Personalizado</button>
+            </div>
+
+            <div className="p-4 flex-1 overflow-y-auto">
+              {modalTab !== 'custom' && (
+                <div className="mb-4 relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-gray-400">search</span>
+                  <input
+                    type="text"
+                    placeholder={modalTab === 'service' ? "Buscar serviço..." : "Buscar peça..."}
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm outline-none focus:ring-2 focus:ring-[#0B2A5B]/20"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                {modalTab === 'service' && searchResults.map(item => (
+                  <button key={item.id} onClick={() => addItem(item, 'service')} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl border border-transparent hover:border-gray-100 text-left group transition-all">
+                    <div>
+                      <div className="font-bold text-[#111418]">{item.title}</div>
+                      <div className="text-xs text-gray-500 line-clamp-1">{item.description || 'Sem descrição'}</div>
+                    </div>
+                    <div className="text-[#0B2A5B] font-bold">
+                      + R$ {item.price ? item.price.toFixed(2) : '0.00'}
+                    </div>
+                  </button>
+                ))}
+                {modalTab === 'part' && searchResults.map(item => (
+                  <button key={item.id} onClick={() => addItem(item, 'part')} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl border border-transparent hover:border-gray-100 text-left group transition-all">
+                    <div>
+                      <div className="font-bold text-[#111418]">{item.name}</div>
+                      <div className="text-xs text-gray-500">{item.category}</div>
+                    </div>
+                    <div className="text-[#0B2A5B] font-bold">
+                      + R$ {item.sale_price ? item.sale_price.toFixed(2) : '0.00'}
+                    </div>
+                  </button>
+                ))}
+
+                {modalTab === 'custom' && (
+                  <form onSubmit={handleCustomAdd} className="flex flex-col gap-4">
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Nome do Item</label>
+                      <input name="customName" type="text" required className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none focus:ring-2 focus:ring-[#0B2A5B]/20" placeholder="Ex: Mão de obra extra" />
+                    </div>
+                    <div>
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Preço (R$)</label>
+                      <input name="customPrice" type="number" step="0.01" required className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none focus:ring-2 focus:ring-[#0B2A5B]/20" placeholder="0.00" />
+                    </div>
+                    <button type="submit" className="w-full bg-[#0B2A5B] text-white font-bold py-3 rounded-xl shadow-lg mt-2">
+                      Adicionar Item
+                    </button>
+                  </form>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Discount Modal */}
+      {isDiscountModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm transition-opacity">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl overflow-hidden p-6 animate-scale-in">
+            <h3 className="text-lg font-bold text-[#111418] mb-4">Adicionar Desconto</h3>
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">Valor do Desconto (R$)</label>
+              <input
+                type="number"
+                step="0.01"
+                className="w-full p-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#0B2A5B]/20 text-lg font-semibold"
+                placeholder="0,00"
+                value={tempDiscount}
+                onChange={(e) => setTempDiscount(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setIsDiscountModalOpen(false)}
+                className="flex-1 py-3 text-gray-600 font-bold bg-gray-100 rounded-xl hover:bg-gray-200"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={applyDiscount}
+                className="flex-1 py-3 text-white font-bold bg-[#0B2A5B] rounded-xl hover:bg-[#09224a] shadow-lg shadow-[#0B2A5B]/20"
+              >
+                Aplicar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
