@@ -3,6 +3,7 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { supabase } from './supabaseClient';
+import { Session } from '@supabase/supabase-js';
 import { Dashboard } from './components/Dashboard';
 import { Clients } from './components/Clients';
 import { ClientDetails } from './components/ClientDetails';
@@ -44,12 +45,23 @@ import { MonthlyProgressScreen } from './components/MonthlyProgressScreen';
 
 export type Screen = 'dashboard' | 'clients' | 'client-details' | 'inventory' | 'quotes' | 'new-quote' | 'quote-add-item' | 'quote-item-avulso' | 'quote-select-service' | 'quote-select-equipment' | 'view-quote' | 'schedule' | 'settings' | 'premium' | 'new-part' | 'new-category' | 'company-details' | 'user-profile' | 'new-appointment' | 'new-client' | 'services' | 'new-service' | 'edit-service' | 'appointment-details' | 'finance' | 'new-transaction' | 'advanced-filter' | 'login' | 'signup' | 'forgot-password' | 'email-sent-success' | 'email-sent-error' | 'new-password' | 'welcome' | 'signup-success' | 'reschedule' | 'monthly-progress';
 
-export default function App() {
+const App: React.FC = () => {
+  const [session, setSession] = useState<Session | null>(null);
+  const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
-  const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [quoteValidityDate, setQuoteValidityDate] = useState('2023-11-24');
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
+  const [currentClientId, setCurrentClientId] = useState<string | null>(null);
+
+  // ... (existing code)
+
+  // ... (existing code)
+
+  // ... (existing code, updating Clients and NewClient props)
+
+
+
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
 
@@ -58,6 +70,7 @@ export default function App() {
   useEffect(() => {
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
       if (session) {
         setCurrentScreen('dashboard');
       }
@@ -68,15 +81,12 @@ export default function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth event:', event, session);
+      setSession(session);
       if (session) {
-        // If we have a session, ensuring we are on dashboard (or let specific logic handle deep links later)
-        // For now, if we just logged in (SIGNED_IN), go to dashboard.
         if (event === 'SIGNED_IN') {
           setCurrentScreen('dashboard');
         }
       } else if (event === 'SIGNED_OUT') {
-        // Only redirect to welcome if explicitly signed out
         setCurrentScreen('welcome');
       }
     });
@@ -92,6 +102,31 @@ export default function App() {
     closeSidebar();
     setIsQuickActionsOpen(false); // Close quick actions if navigating
     window.scrollTo(0, 0);
+  };
+
+  const handleEditQuote = (quoteId: string) => {
+    setCurrentQuoteId(quoteId);
+    handleNavigate('new-quote');
+  };
+
+  const handleViewQuote = (quoteId: string) => {
+    setCurrentQuoteId(quoteId);
+    handleNavigate('view-quote');
+  };
+
+  const handleNewQuote = () => {
+    setCurrentQuoteId(null);
+    handleNavigate('new-quote');
+  };
+
+  const handleEditClient = (clientId: string) => {
+    setCurrentClientId(clientId);
+    handleNavigate('new-client');
+  };
+
+  const handleNewClient = () => {
+    setCurrentClientId(null);
+    handleNavigate('new-client');
   };
 
   return (
@@ -180,12 +215,16 @@ export default function App() {
         <Clients
           onClientClick={() => handleNavigate('client-details')}
           onBack={() => handleNavigate('dashboard')}
-          onNewClient={() => handleNavigate('new-client')}
+          onNewClient={handleNewClient}
+          onEditClient={handleEditClient}
         />
       )}
 
       {currentScreen === 'new-client' && (
-        <NewClient onBack={() => handleNavigate('clients')} />
+        <NewClient
+          onBack={() => handleNavigate('clients')}
+          clientId={currentClientId}
+        />
       )}
 
       {currentScreen === 'client-details' && (
@@ -213,13 +252,16 @@ export default function App() {
       {currentScreen === 'quotes' && (
         <Quotes
           onBack={() => handleNavigate('dashboard')}
-          onNewQuote={() => handleNavigate('new-quote')}
+          onNewQuote={handleNewQuote}
           onFilter={() => handleNavigate('advanced-filter')}
+          onEditQuote={handleEditQuote}
+          onViewQuote={handleViewQuote}
         />
       )}
 
       {currentScreen === 'new-quote' && (
         <NewQuote
+          quoteId={currentQuoteId}
           onBack={() => handleNavigate('quotes')}
           onGenerate={(date: string, quoteId?: string) => {
             setQuoteValidityDate(date);
@@ -232,7 +274,7 @@ export default function App() {
 
       {currentScreen === 'quote-add-item' && (
         <QuoteAddItem
-          onBack={() => handleNavigate('new-quote')}
+          onBack={() => handleNavigate('quotes')}
           onNavigate={handleNavigate}
         />
       )}
@@ -251,9 +293,10 @@ export default function App() {
 
       {currentScreen === 'view-quote' && (
         <ViewQuote
-          onBack={() => handleNavigate('new-quote')}
+          onBack={() => handleNavigate('quotes')}
           validityDate={quoteValidityDate}
           quoteId={currentQuoteId || undefined}
+          onEdit={handleEditQuote}
         />
       )}
 
@@ -337,3 +380,4 @@ export default function App() {
     </div>
   );
 }
+export default App;

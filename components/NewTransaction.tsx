@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 interface NewTransactionProps {
   onBack: () => void;
@@ -16,6 +17,7 @@ export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack, onSave }
     category: '',
     notes: ''
   });
+  const { showAlert } = useAlert();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -33,7 +35,7 @@ export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack, onSave }
 
   const handleSave = async () => {
     if (!formData.amount || !formData.title || !formData.category || !formData.date) {
-      alert('Por favor, preencha valor, título, data e categoria.');
+      showAlert('Atenção', 'Por favor, preencha valor, título, data e categoria.', 'warning');
       return;
     }
 
@@ -58,7 +60,7 @@ export const NewTransaction: React.FC<NewTransactionProps> = ({ onBack, onSave }
       onBack();
     } catch (error: any) {
       console.error('Error saving transaction:', error);
-      alert('Erro ao salvar transação.');
+      showAlert('Erro', 'Erro ao salvar transação.', 'error');
     } finally {
       setLoading(false);
     }

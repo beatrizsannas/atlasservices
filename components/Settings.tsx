@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Screen } from '../App';
+import { supabase } from '../supabaseClient';
 
 interface SettingsProps {
   onBack: () => void;
@@ -7,6 +8,39 @@ interface SettingsProps {
 }
 
 export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigate }) => {
+  const [profile, setProfile] = useState({ name: 'Usuário', email: 'email@exemplo.com', avatar_url: '' });
+
+  const fetchProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
+
+      if (data) {
+        setProfile({
+          name: data.full_name || 'Usuário',
+          email: user.email || '',
+          avatar_url: data.avatar_url || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching settings profile:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+
+    // Listen for custom update event
+    const handleProfileUpdate = () => {
+      fetchProfile();
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    return () => window.removeEventListener('profile-updated', handleProfileUpdate);
+  }, []);
+
   return (
     <div className="flex flex-col min-h-screen pb-32 bg-background-light">
       <header className="flex items-center bg-white px-4 py-3 justify-between sticky top-0 z-10 border-b border-gray-100">
@@ -26,8 +60,8 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigate }) => {
           <div className="flex px-5 py-6 flex-col items-center bg-white shadow-sm rounded-xl border border-gray-100">
             <div className="relative mb-3 group cursor-pointer" onClick={() => onNavigate('user-profile')}>
               <div
-                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-20 w-20 ring-4 ring-primary/10"
-                style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuCyV7Zj8tifxtx0xl51l9npr1RVVLjB53h9j1tykXyly7xc76klWSlDZq-jz8wdFjq639GfTg-GW9kykTrE7CUlfkpzs2bRyb9qaxNg9geALMPvuN8nlLVXTn3p1r_d6cN87cBRrRcMMaCwN5T2KvvHR2BnmdRSyPfYmM-0vOlTIfVyaoSVWxNNBK2hhA_Jqdn8a112iOORgC4t-QuUA295BEBJFri1ljqA1FUdWqOlkClrRuAzJ-z3mpTp70onX8hHaIplkmL9zTPX")' }}
+                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-20 w-20 ring-4 ring-primary/10 bg-gray-200"
+                style={{ backgroundImage: profile.avatar_url ? `url("${profile.avatar_url}")` : undefined }}
               >
               </div>
               <div className="absolute bottom-0 right-0 bg-primary text-white p-1 rounded-full border-2 border-white flex items-center justify-center">
@@ -35,8 +69,8 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigate }) => {
               </div>
             </div>
             <div className="flex flex-col items-center justify-center gap-0.5">
-              <p className="text-[#111418] text-lg font-bold leading-tight font-display">Carlos Silva</p>
-              <p className="text-[#637188] text-xs font-normal leading-normal text-center">carlos.silva@freelancer.com</p>
+              <p className="text-[#111418] text-lg font-bold leading-tight font-display">{profile.name}</p>
+              <p className="text-[#637188] text-xs font-normal leading-normal text-center">{profile.email}</p>
             </div>
           </div>
         </div>

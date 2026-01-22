@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 interface NewServiceProps {
     onBack: () => void;
@@ -14,6 +15,7 @@ export const NewService: React.FC<NewServiceProps> = ({ onBack, onSave }) => {
         time: '',
         description: ''
     });
+    const { showAlert } = useAlert();
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { type, value } = e.target;
@@ -25,7 +27,7 @@ export const NewService: React.FC<NewServiceProps> = ({ onBack, onSave }) => {
 
     const handleSave = async () => {
         if (!formData.title || !formData.price || !formData.time) {
-            alert('Por favor, preencha todos os campos obrigatórios.');
+            showAlert('Atenção', 'Por favor, preencha todos os campos obrigatórios.', 'warning');
             return;
         }
 
@@ -52,7 +54,7 @@ export const NewService: React.FC<NewServiceProps> = ({ onBack, onSave }) => {
             onBack();
         } catch (error: any) {
             console.error('Error saving service:', error);
-            alert('Erro ao salvar serviço: ' + error.message);
+            showAlert('Erro', 'Erro ao salvar serviço: ' + error.message, 'error');
         } finally {
             setLoading(false);
         }

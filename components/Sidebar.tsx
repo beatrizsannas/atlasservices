@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Screen } from '../App';
+import { supabase } from '../supabaseClient';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -8,6 +9,50 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onNavigate }) => {
+  const [profile, setProfile] = useState({ name: 'Usuário', role: 'Freelancer', avatar_url: '' });
+
+  const getInitials = (name: string) => {
+    if (!name) return '';
+    const names = name.split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return name[0].toUpperCase();
+  }
+
+  const fetchProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
+
+      if (data) {
+        setProfile({
+          name: data.full_name || 'Usuário',
+          role: 'Freelancer', // Role isn't in DB yet, keeping static
+          avatar_url: data.avatar_url || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching sidebar profile:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchProfile();
+    }
+
+    // Listen for custom update event
+    const handleProfileUpdate = () => {
+      fetchProfile();
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    return () => window.removeEventListener('profile-updated', handleProfileUpdate);
+  }, [isOpen]);
+
   return (
     <div
       className={`fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -23,12 +68,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onNavigate })
         <div className="p-6 border-b border-gray-100 bg-background-light">
           <div className="flex items-center gap-4">
             <div
-              className="h-14 w-14 rounded-full bg-cover bg-center border-2 border-white shadow-md"
-              style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAV-TgHwClQjQE4-PusmBFfOT0WrXzYMhQ3WVNOlkvadY8aclH8kiSiUz1NNuvjiTv9HwWSWx0YMGeFH8uBHKjbWUxlzaBdkjyb2FBP3MZdd45YOrByKxpvK_BLWO11Z8GnmzId8ZkkL5sv9OlAHuGALUg_eKAe3xgip20rZKbqNvSsp5Xfdwgdvibj7tM1gNFrH4suuu9bayiIhYNHG-FXC5XsWQzX5zi7v0aJ7KRY_ETz8rvp4oMngkO_dzyvfhqrvIp_ccevOoQU")' }}
-            />
+              className="h-14 w-14 rounded-full bg-cover bg-center border-2 border-white shadow-md bg-gray-200 flex items-center justify-center text-[#111418] font-bold text-lg"
+              style={profile.avatar_url ? { backgroundImage: `url("${profile.avatar_url}")` } : {}}
+            >
+              {!profile.avatar_url && getInitials(profile.name)}
+            </div>
             <div>
-              <h2 className="text-xl font-bold text-primary leading-tight">João</h2>
-              <p className="text-sm text-gray-500">Freelancer</p>
+              <h2 className="text-xl font-bold text-primary leading-tight">{profile.name}</h2>
+              <p className="text-sm text-gray-500">{profile.role}</p>
             </div>
           </div>
         </div>

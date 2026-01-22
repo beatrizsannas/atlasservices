@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 export interface Service {
   id: string;
@@ -19,6 +20,7 @@ export const Services: React.FC<ServicesProps> = ({ onBack, onNewService, onEdit
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const { showAlert, showConfirm } = useAlert();
 
   useEffect(() => {
     fetchServices();
@@ -43,15 +45,17 @@ export const Services: React.FC<ServicesProps> = ({ onBack, onNewService, onEdit
 
   const handleDelete = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!window.confirm('Tem certeza que deseja excluir este serviço?')) return;
+    const confirmed = await showConfirm('Excluir Serviço', 'Tem certeza que deseja excluir este serviço?');
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase.from('services').delete().eq('id', id);
       if (error) throw error;
       setServices(prev => prev.filter(s => s.id !== id));
+      showAlert('Sucesso', 'Serviço excluído com sucesso.', 'success');
     } catch (error) {
       console.error('Error deleting service:', error);
-      alert('Erro ao excluir serviço.');
+      showAlert('Erro', 'Erro ao excluir serviço.', 'error');
     }
   };
 

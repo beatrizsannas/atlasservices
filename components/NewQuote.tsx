@@ -1,17 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 interface NewQuoteProps {
   onBack: () => void;
   onGenerate: (date: string, quoteId?: string) => void;
-  onAdd: () => void; // Deprecated/unused in new modal flow but kept for prop signature
+  onAdd: () => void;
+  quoteId?: string | null;
 }
 
-export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
+export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId }) => {
   const [items, setItems] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClientId, setSelectedClientId] = useState('');
-  const [validityDate, setValidityDate] = useState('2023-11-24');
+  const [validityDate, setValidityDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 15);
+    return d.toISOString().split('T')[0];
+  });
   const [loading, setLoading] = useState(false);
   const [fetchingDeps, setFetchingDeps] = useState(true);
 
@@ -27,7 +33,10 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
 
   useEffect(() => {
     fetchDependencies();
-  }, []);
+    if (quoteId) {
+      fetchQuoteDetails();
+    }
+  }, [quoteId]);
 
   useEffect(() => {
     if (isModalOpen) {
@@ -49,6 +58,56 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
       setFetchingDeps(false);
     } catch (error) {
       console.error('Error fetching deps', error);
+    }
+  }
+
+  const fetchQuoteDetails = async () => {
+    if (!quoteId) return;
+
+    try {
+      setLoading(true);
+
+      // Fetch Quote
+      const { data: quote, error: quoteError } = await supabase
+        .from('quotes')
+        .select('*')
+        .eq('id', quoteId)
+        .single();
+
+      if (quoteError) throw quoteError;
+
+      if (quote) {
+        setSelectedClientId(quote.client_id);
+        setValidityDate(quote.valid_until);
+        setDiscount(quote.discount || 0);
+      }
+
+      // Fetch Items
+      const { data: items, error: itemsError } = await supabase
+        .from('quote_items')
+        .select('*')
+        .eq('quote_id', quoteId);
+
+      if (itemsError) throw itemsError;
+
+      if (items) {
+        const mappedItems = items.map((item: any) => ({
+          id: Date.now() + Math.random(), // Temporary ID for UI
+          original_id: item.related_id, // We might need to store this better if we want to track deps
+          name: item.description,
+          type: item.item_type === 'service' ? 'Serviço' : (item.item_type === 'part' ? 'Peça' : 'Personalizado'),
+          origin: item.item_type,
+          quantity: item.quantity,
+          price: item.unit_price
+        }));
+        setItems(mappedItems);
+      }
+
+    } catch (error: any) {
+      console.error('Error fetching quote details:', error);
+      showAlert('Erro', 'Erro ao carregar orçamento: ' + error.message, 'error');
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -114,12 +173,22 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
   const [discount, setDiscount] = useState(0);
   const [isDiscountModalOpen, setIsDiscountModalOpen] = useState(false);
   const [tempDiscount, setTempDiscount] = useState('');
+  const { showAlert } = useAlert();
 
   const total = Math.max(0, subtotal - discount);
 
   const openDiscountModal = () => {
-    setTempDiscount(discount.toString());
+    setTempDiscount(discount.toFixed(2));
     setIsDiscountModalOpen(true);
+  }
+
+  const handleBlurDiscount = () => {
+    const val = parseFloat(tempDiscount.replace(',', '.'));
+    if (!isNaN(val)) {
+      setTempDiscount(val.toFixed(2));
+    } else {
+      setTempDiscount('0.00');
+    }
   }
 
   const applyDiscount = () => {
@@ -136,11 +205,11 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
 
   const handleSave = async () => {
     if (!selectedClientId) {
-      alert('Selecione um cliente.');
+      showAlert('Atenção', 'Selecione um cliente.', 'warning');
       return;
     }
     if (items.length === 0) {
-      alert('Adicione pelo menos um item.');
+      showAlert('Atenção', 'Adicione pelo menos um item.', 'warning');
       return;
     }
 
@@ -149,17 +218,40 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // 1. Create Quote
-      const { data: quoteData, error: quoteError } = await supabase.from('quotes').insert({
-        user_id: user.id,
-        client_id: selectedClientId,
-        valid_until: validityDate,
-        total_amount: total,
-        discount: discount,
-        status: 'pending' // or draft
-      }).select().single();
+      // 1. Create or Update Quote
+      let quoteData: any;
 
-      if (quoteError) throw quoteError;
+      if (quoteId) {
+        // Update
+        const { data, error } = await supabase.from('quotes').update({
+          client_id: selectedClientId,
+          valid_until: validityDate,
+          total_amount: total,
+          discount: discount,
+          status: 'pending' // Reset to pending on edit? Or keep? Let's keep pending logic for now.
+        }).eq('id', quoteId).select().single();
+
+        if (error) throw error;
+        quoteData = data;
+
+        // Delete existing items to replace with new ones (simple approach)
+        const { error: deleteError } = await supabase.from('quote_items').delete().eq('quote_id', quoteId);
+        if (deleteError) throw deleteError;
+
+      } else {
+        // Insert
+        const { data, error } = await supabase.from('quotes').insert({
+          user_id: user.id,
+          client_id: selectedClientId,
+          valid_until: validityDate,
+          total_amount: total,
+          discount: discount,
+          status: 'pending'
+        }).select().single();
+
+        if (error) throw error;
+        quoteData = data;
+      }
 
       // 2. Create Quote Items
       const quoteItems = items.map(item => ({
@@ -178,7 +270,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
 
     } catch (error: any) {
       console.error('Error saving quote:', error);
-      alert('Erro ao salvar orçamento: ' + error.message);
+      showAlert('Erro', 'Erro ao salvar orçamento: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -427,6 +519,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate }) => {
                 placeholder="0,00"
                 value={tempDiscount}
                 onChange={(e) => setTempDiscount(e.target.value)}
+                onBlur={handleBlurDiscount}
                 autoFocus
               />
             </div>

@@ -11,6 +11,14 @@ export const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
 
   useEffect(() => {
     fetchProfile();
+
+    // Listen for custom update event
+    const handleProfileUpdate = () => {
+      fetchProfile();
+    };
+
+    window.addEventListener('profile-updated', handleProfileUpdate);
+    return () => window.removeEventListener('profile-updated', handleProfileUpdate);
   }, []);
 
   const fetchProfile = async () => {
@@ -33,6 +41,16 @@ export const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
     }
   }
 
+  /* Helper */
+  const getInitials = (name: string) => {
+    if (!name) return '';
+    const names = name.split(' ');
+    if (names.length >= 2) {
+      return `${names[0][0]}${names[1][0]}`.toUpperCase();
+    }
+    return name[0].toUpperCase();
+  }
+
   return (
     <div className="sticky top-0 z-50 bg-background-light/90 backdrop-blur-md px-4 py-3 border-b border-gray-200 flex justify-between items-center transition-colors duration-200">
       <div className="flex items-center gap-3">
@@ -46,20 +64,24 @@ export const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
 
         <div
           onClick={onProfileClick}
-          className="h-10 w-10 rounded-full bg-cover bg-center border-2 border-white shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-gray-200"
-          style={{ backgroundImage: avatarUrl ? `url("${avatarUrl}")` : undefined }}
-          aria-label="Open sidebar"
+          className="h-10 w-10 rounded-full bg-cover bg-center border-2 border-white shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-gray-200 flex items-center justify-center text-[#111418] font-bold text-sm"
+          style={avatarUrl ? { backgroundImage: `url("${avatarUrl}")` } : {}}
         >
-          {!avatarUrl && <span className="flex w-full h-full items-center justify-center text-gray-400 material-symbols-outlined text-sm">person</span>}
+          {!avatarUrl && getInitials(userName)}
         </div>
-        <div onClick={onProfileClick} className="cursor-pointer">
-          <h1 className="text-sm font-medium text-gray-500">Atlas Services</h1>
-          <h2 className="text-primary font-bold text-lg leading-none">Olá, {userName}</h2>
+
+        <div onClick={onProfileClick} className="flex flex-col cursor-pointer">
+          <span className="text-xs text-gray-400 font-medium">Olá,</span>
+          <span className="text-[#111418] font-bold text-base leading-none">{userName}</span>
         </div>
       </div>
-      <button className="flex items-center justify-center h-10 w-10 rounded-full hover:bg-gray-200 transition-colors">
-        <span className="material-symbols-outlined text-primary" style={{ fontVariationSettings: "'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24" }}>notifications</span>
-      </button>
+
+      <div className="flex items-center gap-2">
+        <button className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors relative">
+          <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>notifications</span>
+          <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
+        </button>
+      </div>
     </div>
   );
 };

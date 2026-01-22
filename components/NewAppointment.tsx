@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 interface NewAppointmentProps {
   onBack: () => void;
@@ -35,6 +36,7 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
   const [selectedItem, setSelectedItem] = useState<any>(null); // Service or Quote
   const dropdownRef = useRef<HTMLDivElement>(null);
   const clientDropdownRef = useRef<HTMLDivElement>(null);
+  const { showAlert } = useAlert();
 
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -60,15 +62,17 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
 
   const fetchDependencies = async () => {
     try {
-      const { data: clientsData } = await supabase.from('clients').select('id, name');
+      const { data: clientsData } = await supabase.from('clients').select('*');
       if (clientsData) setClients(clientsData);
 
       const { data: servicesData } = await supabase.from('services').select('id, title, duration_minutes');
       if (servicesData) setServices(servicesData);
 
       // Fetch quotes if needed, or fetch on demand
-      const { data: quotesData } = await supabase.from('quotes').select('id, client_id, total, created_at, clients(name)'); // rudimentary quote info
+      const { data: quotesData } = await supabase.from('quotes').select('id, client_id, total, created_at, clients(name)');
+      console.log('Quotes loaded:', quotesData);
       if (quotesData) {
+        console.log('Quote Client IDs:', quotesData.map((q: any) => q.client_id)); // Debug log
         const formattedQuotes = quotesData.map((q: any) => ({
           id: q.id,
           title: `Orçamento #${q.id.substr(0, 8)} - ${q.clients?.name}`,
@@ -82,17 +86,22 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
     }
   };
 
+  // ... (rest of code)
+
+  // Inside the return, finding the address block to replace logic
+
+
   const handleSave = async () => {
     if (!selectedClient) {
-      alert('Selecione um cliente.');
+      showAlert('Atenção', 'Selecione um cliente.', 'warning');
       return;
     }
     if (!selectedDate) {
-      alert('Selecione uma data.');
+      showAlert('Atenção', 'Selecione uma data.', 'warning');
       return;
     }
     if (!startTime || !endTime) {
-      alert('Selecione horário de início e fim.');
+      showAlert('Atenção', 'Selecione horário de início e fim.', 'warning');
       return;
     }
 
@@ -120,7 +129,7 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
       onBack();
     } catch (error: any) {
       console.error('Error saving appointment:', error);
-      alert('Erro ao salvar agendamento: ' + error.message);
+      showAlert('Erro', 'Erro ao salvar agendamento: ' + error.message, 'error');
     } finally {
       setLoading(false);
     }
@@ -192,7 +201,10 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
     return `${d}/${m}/${y}`;
   };
 
-  const filteredClients = clients.filter(c => c.name.toLowerCase().includes(clientSearch.toLowerCase()));
+  const filteredClients = clients.filter(c =>
+    c.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
+    (c.company_name && c.company_name.toLowerCase().includes(clientSearch.toLowerCase()))
+  );
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light font-display text-[#111418] antialiased overflow-x-hidden">
@@ -250,6 +262,29 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
                   <span className="material-symbols-outlined text-[18px]">add</span>
                 </button>
               </div>
+
+              {/* Client Address Display */}
+              {selectedClient && (
+                <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm md:text-xs text-gray-600 flex flex-col gap-1">
+                  <div className="font-semibold text-gray-800 flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[16px]">location_on</span>
+                    Endereço
+                  </div>
+                  {selectedClient.address ? (
+                    <>
+                      <p>{selectedClient.address}{selectedClient.number ? `, ${selectedClient.number}` : ''}</p>
+                      {(selectedClient.city || selectedClient.state) && (
+                        <p>
+                          {selectedClient.neighborhood ? `${selectedClient.neighborhood} - ` : ''}
+                          {selectedClient.city}{selectedClient.city && selectedClient.state ? '/' : ''}{selectedClient.state}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="italic text-gray-400">Endereço não cadastrado</p>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -323,18 +358,27 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack }) => {
                         </button>
                       ))
                     ) : (
-                      quotes.map((quote) => (
-                        <button
-                          key={quote.id}
-                          className="w-full text-left px-4 py-2.5 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
-                          onClick={() => {
-                            setSelectedItem(quote);
-                            setIsDropdownOpen(false);
-                          }}
-                        >
-                          {quote.title}
-                        </button>
-                      ))
+                      (() => {
+                        const filtered = quotes.filter(quote => !selectedClient || quote.client_id == selectedClient.id);
+                        return filtered.length > 0 ? (
+                          filtered.map((quote) => (
+                            <button
+                              key={quote.id}
+                              className="w-full text-left px-4 py-2.5 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                              onClick={() => {
+                                setSelectedItem(quote);
+                                setIsDropdownOpen(false);
+                              }}
+                            >
+                              {quote.title}
+                            </button>
+                          ))
+                        ) : (
+                          <div className="p-4 text-sm text-gray-500 text-center">
+                            {selectedClient ? 'Nenhum orçamento encontrado para este cliente' : 'Selecione um cliente para ver os orçamentos'}
+                          </div>
+                        );
+                      })()
                     )}
                   </div>
                 )}

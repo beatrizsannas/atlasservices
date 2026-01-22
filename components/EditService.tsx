@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 import { Service } from './Services';
 
 interface EditServiceProps {
@@ -15,6 +16,7 @@ export const EditService: React.FC<EditServiceProps> = ({ onBack, service }) => 
         timeRaw: '', // User input string like "1h 30m"
         description: ''
     });
+    const { showAlert } = useAlert();
 
     useEffect(() => {
         if (service) {
@@ -72,7 +74,7 @@ export const EditService: React.FC<EditServiceProps> = ({ onBack, service }) => 
     const handleUpdate = async () => {
         if (!service) return;
         if (!formData.title || !formData.price) {
-            alert('Por favor, preencha nome e valor.');
+            showAlert('Atenção', 'Por favor, preencha nome e valor.', 'warning');
             return;
         }
 
@@ -95,7 +97,7 @@ export const EditService: React.FC<EditServiceProps> = ({ onBack, service }) => 
             onBack();
         } catch (error: any) {
             console.error('Error updating service:', error);
-            alert('Erro ao atualizar serviço.');
+            showAlert('Erro', 'Erro ao atualizar serviço.', 'error');
         } finally {
             setLoading(false);
         }

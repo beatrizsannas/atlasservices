@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 import { Screen } from '../App';
 
 interface NewPartProps {
@@ -17,6 +18,7 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
     costPrice: '',
     salePrice: ''
   });
+  const { showAlert } = useAlert();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -32,7 +34,7 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
 
   const handleSave = async () => {
     if (!formData.name || !formData.category) {
-      alert('Por favor, preencha nome e categoria.');
+      showAlert('Atenção', 'Por favor, preencha nome e categoria.', 'warning');
       return;
     }
 
@@ -56,7 +58,7 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
       onBack();
     } catch (error: any) {
       console.error('Error saving part:', error);
-      alert('Erro ao salvar peça.');
+      showAlert('Erro', 'Erro ao salvar peça.', 'error');
     } finally {
       setLoading(false);
     }

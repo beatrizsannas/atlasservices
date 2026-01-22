@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 interface NewClientProps {
   onBack: () => void;
+  clientId?: string | null;
 }
 
-export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
+export const NewClient: React.FC<NewClientProps> = ({ onBack, clientId }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -14,6 +16,40 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
     address: '',
     notes: ''
   });
+  const { showAlert } = useAlert();
+
+  useEffect(() => {
+    if (clientId) {
+      fetchClientData();
+    }
+  }, [clientId]);
+
+  const fetchClientData = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setFormData({
+          name: data.name || '',
+          phone: data.phone || '',
+          email: data.email || '',
+          address: data.address || '',
+          notes: data.notes || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching client:', error);
+      showAlert('Erro', 'Erro ao carregar dados do cliente.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
@@ -22,34 +58,53 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
 
   const handleSave = async () => {
     if (!formData.name.trim()) {
-      alert('Por favor, informe o nome do cliente.');
+      showAlert('Atenção', 'Por favor, informe o nome do cliente.', 'warning');
       return;
     }
 
-    setLoading(true);
     try {
+      setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
-        alert('Você precisa estar logado para realizar esta ação.');
+        showAlert('Erro', 'Você precisa estar logado para realizar esta ação.', 'error');
         return;
       }
 
-      const { error } = await supabase.from('clients').insert({
-        user_id: user.id,
-        name: formData.name,
-        phone: formData.phone,
-        email: formData.email,
-        address: formData.address,
-        notes: formData.notes
-      });
+      if (clientId) {
+        // Update existing client
+        const { error } = await supabase
+          .from('clients')
+          .update({
+            name: formData.name,
+            phone: formData.phone,
+            email: formData.email,
+            address: formData.address,
+            notes: formData.notes
+          })
+          .eq('id', clientId);
 
-      if (error) throw error;
+        if (error) throw error;
+        showAlert('Sucesso', 'Cliente atualizado com sucesso!', 'success');
+      } else {
+        // Create new client
+        const { error } = await supabase.from('clients').insert({
+          user_id: user.id,
+          name: formData.name,
+          phone: formData.phone,
+          email: formData.email,
+          address: formData.address,
+          notes: formData.notes
+        });
+
+        if (error) throw error;
+        showAlert('Sucesso', 'Cliente cadastrado com sucesso!', 'success');
+      }
 
       onBack();
     } catch (error: any) {
-      console.error('Erro ao salvar cliente:', error);
-      alert('Erro ao salvar cliente: ' + (error.message || 'Erro desconhecido'));
+      console.error('Error saving client:', error);
+      showAlert('Erro', 'Erro ao salvar cliente: ' + (error.message || 'Erro desconhecido'), 'error');
     } finally {
       setLoading(false);
     }
@@ -64,7 +119,7 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
         >
           <span className="material-symbols-outlined text-white" style={{ fontVariationSettings: "'FILL' 0, 'wght' 400" }}>close</span>
         </button>
-        <h1 className="text-lg font-bold text-white absolute left-1/2 -translate-x-1/2">Novo Cliente</h1>
+        <h1 className="text-lg font-bold text-white absolute left-1/2 -translate-x-1/2">{clientId ? 'Editar Cliente' : 'Novo Cliente'}</h1>
         <div className="w-10"></div>
       </div>
 
@@ -154,7 +209,7 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack }) => {
             ) : (
               <span className="material-symbols-outlined">save</span>
             )}
-            {loading ? 'Salvando...' : 'Salvar Cliente'}
+            {loading ? 'Salvando...' : (clientId ? 'Atualizar Cliente' : 'Salvar Cliente')}
           </button>
         </div>
       </main>

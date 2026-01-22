@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 interface ScheduleProps {
   onNewAppointment?: () => void;
@@ -13,6 +14,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const { showAlert } = useAlert();
 
   // State for date inputs
   const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);

@@ -1,11 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 interface UserProfileProps {
     onBack: () => void;
 }
 
 export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
+
+    const getInitials = (name: string) => {
+        if (!name) return '';
+        const names = name.split(' ');
+        if (names.length >= 2) {
+            return `${names[0][0]}${names[1][0]}`.toUpperCase();
+        }
+        return name[0].toUpperCase();
+    }
+
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [email, setEmail] = useState('');
@@ -15,6 +26,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
         cpf: '',
         avatar_url: ''
     });
+    const { showAlert } = useAlert();
 
     useEffect(() => {
         getProfile();
@@ -64,7 +76,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
             const { data: { user } } = await supabase.auth.getUser();
 
             if (!user) {
-                alert('Usuário não autenticado.');
+                showAlert('Erro', 'Usuário não autenticado.', 'error');
                 return;
             }
 
@@ -81,10 +93,14 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
 
             if (error) throw error;
 
-            alert('Perfil atualizado com sucesso!');
+            showAlert('Sucesso', 'Perfil atualizado com sucesso!', 'success');
+
+            // Dispatch custom event to notify Sidebar/Header to refresh
+            window.dispatchEvent(new Event('profile-updated'));
+
         } catch (error: any) {
-            console.error('Error updating profile:', error);
-            alert('Erro ao atualizar perfil: ' + error.message);
+            console.error('Error saving profile:', error);
+            showAlert('Erro', 'Erro ao atualizar perfil: ' + error.message, 'error');
         } finally {
             setSaving(false);
         }
@@ -118,17 +134,17 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
                     <div className="relative group cursor-pointer">
                         {/* Avatar display - placeholder if empty */}
                         <div
-                            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-28 w-28 ring-4 ring-white shadow-md bg-gray-200 flex items-center justify-center"
+                            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-28 w-28 ring-4 ring-white shadow-md bg-gray-200 flex items-center justify-center text-[#111418] font-bold text-3xl"
                             style={formData.avatar_url ? { backgroundImage: `url("${formData.avatar_url}")` } : {}}
                         >
-                            {!formData.avatar_url && <span className="material-symbols-outlined text-4xl text-gray-400">person</span>}
+                            {!formData.avatar_url && (formData.full_name ? getInitials(formData.full_name) : <span className="material-symbols-outlined text-4xl text-gray-400">person</span>)}
                         </div>
                         <div className="absolute bottom-1 right-1 bg-primary text-white p-2 rounded-full border-2 border-white flex items-center justify-center shadow-sm">
                             <span className="material-symbols-outlined text-sm">edit</span>
                         </div>
                     </div>
                     {/* Image upload not fully implemented yet, just a button for now */}
-                    <p className="mt-3 text-primary font-semibold text-sm cursor-pointer hover:underline" onClick={() => alert('Funcionalidade de upload de imagem em breve!')}>Alterar foto</p>
+                    <p className="mt-3 text-primary font-semibold text-sm cursor-pointer hover:underline" onClick={() => showAlert('Em breve', 'Funcionalidade de upload de imagem em breve!', 'info')}>Alterar foto</p>
                 </div>
 
                 <div className="px-4">

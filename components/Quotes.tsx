@@ -1,23 +1,36 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { useAlert } from '../contexts/AlertContext';
 
 interface QuotesProps {
   onBack: () => void;
   onNewQuote?: () => void;
   onFilter?: () => void;
+  onEditQuote?: (id: string) => void;
+  onViewQuote?: (id: string) => void;
 }
 
-export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter }) => {
+// ... imports
+
+export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, onEditQuote, onViewQuote }) => {
   const [quotes, setQuotes] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('Todos');
   const [search, setSearch] = useState('');
+  const [activeMenuQuoteId, setActiveMenuQuoteId] = useState<string | null>(null);
+  const { showAlert, showConfirm } = useAlert();
 
   useEffect(() => {
     fetchQuotes();
+
+    // Close menu on click outside
+    const handleClickOutside = () => setActiveMenuQuoteId(null);
+    window.addEventListener('click', handleClickOutside);
+    return () => window.removeEventListener('click', handleClickOutside);
   }, [filter]);
 
   const fetchQuotes = async () => {
+    // ... existing fetch logic
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
@@ -37,8 +50,6 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter }) 
         .order('created_at', { ascending: false });
 
       if (filter !== 'Todos') {
-        // Map filter label to status value if needed
-        // Assuming status in DB: 'pending', 'approved', 'cancelled', 'draft'
         let statusFilter = '';
         if (filter === 'Pendentes') statusFilter = 'pending';
         else if (filter === 'Aprovados') statusFilter = 'approved';
@@ -75,7 +86,8 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter }) 
             date: new Date(q.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }) + ', ' + new Date(q.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
             value: `R$ ${(q.total_amount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
             status: statusLabel,
-            statusColor: statusColor
+            statusColor: statusColor,
+            rawStatus: q.status
           };
         });
         setQuotes(formattedQuotes);
@@ -87,10 +99,46 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter }) 
     }
   };
 
+  const handleUpdateStatus = async (id: string, newStatus: string) => {
+    try {
+      const { error } = await supabase.from('quotes').update({ status: newStatus }).eq('id', id);
+      if (error) throw error;
+      fetchQuotes(); // Refresh list
+    } catch (error) {
+      console.error('Error updating status:', error);
+      showAlert('Erro', 'Erro ao atualizar status.', 'error');
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    const confirmed = await showConfirm('Excluir Orçamento', 'Tem certeza que deseja excluir este orçamento?');
+    if (!confirmed) return;
+    try {
+      const { error } = await supabase.from('quotes').delete().eq('id', id);
+      if (error) throw error;
+      fetchQuotes(); // Refresh list
+      showAlert('Sucesso', 'Orçamento excluído com sucesso.', 'success');
+    } catch (error) {
+      console.error('Error deleting quote:', error);
+      showAlert('Erro', 'Erro ao excluir orçamento.', 'error');
+    }
+  }
+
+  const toggleMenu = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setActiveMenuQuoteId(activeMenuQuoteId === id ? null : id);
+  }
+
   const filteredQuotes = quotes.filter(q => q.client.toLowerCase().includes(search.toLowerCase()));
+
+  const handleCardClick = (id: string) => {
+    if (onViewQuote) onViewQuote(id);
+  }
 
   return (
     <div className="flex flex-col min-h-screen pb-32 bg-background-light">
+      {/* ... Header and Search ... */}
+      {/* (Keeping existing header code implicitly by not touching it if I target correctly, but I need to be careful with replace) */}
       {/* Header */}
       <div className="sticky top-0 z-50 bg-[#0B2A5B] px-4 pt-safe pb-4 shadow-md transition-colors duration-200">
         <div className="flex items-center justify-between h-14 text-white">
@@ -149,14 +197,88 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter }) 
           <div className="text-center py-10 text-gray-500">Nenhum orçamento encontrado.</div>
         ) : (
           filteredQuotes.map((quote) => (
-            <QuoteCard
+            <div
               key={quote.id}
-              client={quote.client}
-              date={quote.date}
-              value={quote.value}
-              status={quote.status}
-              statusColor={quote.statusColor}
-            />
+              className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative z-auto cursor-pointer active:scale-[0.99] transition-transform"
+              onClick={() => handleCardClick(quote.id)}
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex flex-col">
+                  <h3 className="font-bold text-[#111418] text-base">{quote.client}</h3>
+                  <span className="text-xs text-gray-500 mt-0.5">Criado em {quote.date}</span>
+                </div>
+                <div className="relative">
+                  {/* Menu Trigger */}
+                  <button
+                    onClick={(e) => toggleMenu(e, quote.id)}
+                    className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-400"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {activeMenuQuoteId === quote.id && (
+                    <div className="absolute top-8 right-0 bg-white rounded-xl shadow-xl py-2 w-48 z-10 border border-gray-100 animate-in fade-in zoom-in-95 duration-100">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateStatus(quote.id, 'approved');
+                          setActiveMenuQuoteId(null);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 flex items-center gap-3 transition-colors font-medium text-sm"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                        Aprovar
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onEditQuote) onEditQuote(quote.id);
+                          setActiveMenuQuoteId(null);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-blue-50 text-gray-700 hover:text-blue-700 flex items-center gap-3 transition-colors font-medium text-sm"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">edit</span>
+                        Editar
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleUpdateStatus(quote.id, 'cancelled');
+                          setActiveMenuQuoteId(null);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-gray-100 text-gray-700 hover:text-gray-900 flex items-center gap-3 transition-colors font-medium text-sm"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">cancel</span>
+                        Cancelar
+                      </button>
+                      <div className="my-1 border-t border-gray-100"></div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(quote.id);
+                          setActiveMenuQuoteId(null);
+                        }}
+                        className="w-full px-4 py-3 text-left hover:bg-red-50 text-red-600 flex items-center gap-3 transition-colors font-medium text-sm"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span>
+                        Excluir
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-4 flex justify-between items-end">
+                <div className="flex flex-col">
+                  <p className="text-xs text-gray-500 font-medium">Valor Total</p>
+                  <p className="text-lg font-bold text-primary">{quote.value}</p>
+                </div>
+                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium ${quote.statusColor}`}>
+                  {quote.status}
+                </span>
+              </div>
+            </div>
           ))
         )}
       </main>
@@ -181,18 +303,45 @@ interface QuoteCardProps {
   value: string;
   status: string;
   statusColor: string;
+  onMenu: (e: React.MouseEvent) => void;
+  showMenu: boolean;
+  onApprove: () => void;
+  onCancel: () => void;
+  onDelete: () => void;
 }
 
-const QuoteCard: React.FC<QuoteCardProps> = ({ client, date, value, status, statusColor }) => (
-  <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative">
+const QuoteCard: React.FC<QuoteCardProps> = ({
+  client, date, value, status, statusColor,
+  onMenu, showMenu, onApprove, onCancel, onDelete
+}) => (
+  <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative z-auto">
     <div className="flex justify-between items-start">
       <div className="flex flex-col">
         <h3 className="font-bold text-[#111418] text-base">{client}</h3>
         <span className="text-xs text-gray-500 mt-0.5">Criado em {date}</span>
       </div>
-      <button className="text-gray-400 hover:text-gray-600">
-        <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>more_vert</span>
-      </button>
+      <div className="relative">
+        <button
+          onClick={onMenu}
+          className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: '20px' }}>more_vert</span>
+        </button>
+        {showMenu && (
+          <div className="absolute right-0 top-8 bg-white shadow-xl rounded-lg border border-gray-100 py-1 w-40 z-10 animate-scale-in">
+            <button onClick={(e) => { e.stopPropagation(); onApprove(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+              <span className="material-symbols-outlined text-emerald-500 text-[18px]">check_circle</span> Aprovar
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); onCancel(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2">
+              <span className="material-symbols-outlined text-gray-500 text-[18px]">cancel</span> Cancelar
+            </button>
+            <div className="h-px bg-gray-100 my-1"></div>
+            <button onClick={(e) => { e.stopPropagation(); onDelete(); }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[18px]">delete</span> Excluir
+            </button>
+          </div>
+        )}
+      </div>
     </div>
     <div className="flex justify-between items-end mt-1">
       <div className="flex flex-col">
