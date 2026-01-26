@@ -178,22 +178,33 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Combine date and time for timestamps
-      const startDateTime = `${selectedDate}T${startTime}:00`;
-      const endDateTime = `${selectedDate}T${endTime}:00`;
-
-      const { error } = await supabase.from('appointments').insert({
+      // 1. Insert without related_id first to bypass schema cache issue
+      const { data: insertedData, error: insertError } = await supabase.from('appointments').insert({
         user_id: user.id,
         client_id: selectedClient.id,
-        type: appointmentType, // 'service' or 'quote'
-        related_id: selectedItem?.id || null, // Reverting to related_id as seen in Dashboard
-        start_time: startDateTime,
-        end_time: endDateTime,
+        type: appointmentType,
+        date: selectedDate,
+        start_time: `${startTime}:00`,
+        end_time: `${endTime}:00`,
         notes: notes,
         status: 'scheduled'
-      });
+      }).select().single();
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+
+      // 2. Update with related_id if needed
+      if (selectedItem?.id && insertedData?.id) {
+        const { error: updateError } = await supabase
+          .from('appointments')
+          .update({ related_id: selectedItem.id })
+          .eq('id', insertedData.id);
+
+        if (updateError) {
+          console.warn('Failed to update related_id:', updateError);
+          // Verify if we should alert the user or just log it, as the appointment exists
+        }
+      }
+
       onBack();
     } catch (error: any) {
       console.error('Error saving appointment:', error);
@@ -202,39 +213,6 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
       setLoading(false);
     }
   };
-
-  const debugSchema = async () => {
-    let report = 'Diagnóstico de Colunas:\n';
-
-    // Check related_id
-    try {
-      await supabase.from('appointments').select('related_id').limit(1);
-      report += '✅ related_id: Existe\n';
-    } catch (e: any) {
-      report += `❌ related_id: Erro (${e.message})\n`;
-    }
-
-    // Check service_id
-    try {
-      const { error } = await supabase.from('appointments').select('service_id').limit(1);
-      if (error) throw error;
-      report += '✅ service_id: Existe\n';
-    } catch (e: any) {
-      report += `❌ service_id: Erro (${e.message})\n`;
-    }
-
-    // Check quote_id
-    try {
-      const { error } = await supabase.from('appointments').select('quote_id').limit(1);
-      if (error) throw error;
-      report += '✅ quote_id: Existe\n';
-    } catch (e: any) {
-      report += `❌ quote_id: Erro (${e.message})\n`;
-    }
-
-    alert(report);
-  };
-
 
   const openCalendar = () => {
     // Initialize view based on selected date or current date
@@ -576,12 +554,7 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
             )}
           </button>
 
-          <button
-            onClick={debugSchema}
-            className="w-full mt-2 text-xs text-gray-400 underline p-2"
-          >
-            Diagnosticar Tabela (Debug)
-          </button>
+
         </div>
 
         {/* Calendar Modal */}

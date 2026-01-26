@@ -28,28 +28,28 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
 
+      const todayStr = new Date().toISOString().split('T')[0];
+
       // 1. Daily Summary: Scheduled Today
       const { count: scheduledToday } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .gte('start_time', startOfDay)
-        .lt('start_time', endOfDay)
+        .eq('date', todayStr)
         .eq('status', 'scheduled');
 
       setScheduledCount(scheduledToday || 0);
 
-      // 2. Monthly Summary: Completed This Month (using as proxy for "Services Completed" for now, or could vary logic)
-      // Original UI said "45 Services completed". Let's count completed this MONTH for the big number, or total historical?
-      // Let's assume the "Completed" card refers to COMPLETED THIS MONTH.
+      // 2. Monthly Summary: Completed This Month
+      const startOfMonthStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const endOfMonthStr = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+
       const { count: completedMonth } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        //.gte('start_time', startOfMonth) // Maybe total completed ever is better? Original design was generic. 
-        // Let's stick to Monthly for likely expectation.
-        .gte('start_time', startOfMonth)
-        .lt('start_time', endOfMonth)
+        .gte('date', startOfMonthStr)
+        .lte('date', endOfMonthStr)
         .eq('status', 'completed');
 
       setCompletedCount(completedMonth || 0);
@@ -59,6 +59,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         .from('appointments')
         .select(`
                 id,
+                date,
                 start_time,
                 status,
                 type,
@@ -67,8 +68,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
                 services (title)
             `)
         .eq('user_id', user.id)
-        .gte('start_time', startOfDay)
-        .lt('start_time', endOfDay)
+        .eq('date', todayStr)
         .order('start_time', { ascending: true })
         .limit(5);
 
@@ -93,7 +93,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
           return {
             id: app.id,
-            time: new Date(app.start_time).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            time: app.start_time ? app.start_time.substring(0, 5) : '--:--',
             client: app.clients?.name || 'Cliente',
             service: serviceName,
             status: statusLabel,

@@ -37,6 +37,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
         .from('appointments')
         .select(`
                 id,
+                date,
                 start_time,
                 end_time,
                 status,
@@ -46,42 +47,43 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
                 clients (name, avatar_url),
                 services (title)
             `)
-        .eq('user_id', user.id)
-        .order('start_time', { ascending: true });
+        .eq('user_id', user.id);
 
       const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const todayStr = now.toISOString().split('T')[0];
 
       if (activeTab === 'Hoje') {
-        query = query
-          .gte('start_time', startOfDay.toISOString())
-          .lt('start_time', endOfDay.toISOString());
+        query = query.eq('date', todayStr);
       } else if (activeTab === 'Semana') {
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
+        const startStr = startOfWeek.toISOString().split('T')[0];
+
         const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(startOfWeek.getDate() + 7);
+        endOfWeek.setDate(startOfWeek.getDate() + 6);
+        const endStr = endOfWeek.toISOString().split('T')[0];
 
         query = query
-          .gte('start_time', startOfWeek.toISOString())
-          .lt('start_time', endOfWeek.toISOString());
+          .gte('date', startStr)
+          .lte('date', endStr);
       } else if (activeTab === 'Mês') {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const startStr = startOfMonth.toISOString().split('T')[0];
+
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        const endStr = endOfMonth.toISOString().split('T')[0];
 
         query = query
-          .gte('start_time', startOfMonth.toISOString())
-          .lt('start_time', endOfMonth.toISOString());
+          .gte('date', startStr)
+          .lte('date', endStr);
       } else if (activeTab === 'Outro' && startDate && endDate) {
-        // For 'Outro', we might not want to query immediately until applied? 
-        // But here we rely on state. If activeTab is Outro, startDate and endDate should be used.
-        // We'll require user to hit "Apply" which probably updates startDate/endDate state or just `fetchAppointments` call.
-        // But here useEffect dependencies include them. Let's assume startDate/endDate are set by filter.
         query = query
-          .gte('start_time', `${startDate}T00:00:00`)
-          .lt('start_time', `${endDate}T23:59:59`);
+          .gte('date', startDate)
+          .lte('date', endDate);
       }
+
+      // Order by date then time
+      query = query.order('date', { ascending: true }).order('start_time', { ascending: true });
 
       const { data, error } = await query;
 
@@ -110,8 +112,19 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
           }
 
           // Parse time
-          const start = new Date(app.start_time);
-          const end = new Date(app.end_time);
+          // Combine date and time assuming date is YYYY-MM-DD and time is HH:MM:SS
+          const dateTimeStr = `${app.date}T${app.start_time}`;
+          const endDateTimeStr = `${app.date}T${app.end_time}`;
+
+          const start = new Date(dateTimeStr);
+          const end = new Date(endDateTimeStr);
+
+          // Fallback if invalid date (e.g. legacy data)
+          if (isNaN(start.getTime())) {
+            console.warn("Invalid date/time for appointment", app);
+            // Handle gracefully?
+          }
+
           const timeString = `${start.getHours().toString().padStart(2, '0')}:${start.getMinutes().toString().padStart(2, '0')} - ${end.getHours().toString().padStart(2, '0')}:${end.getMinutes().toString().padStart(2, '0')}`;
 
           return {
