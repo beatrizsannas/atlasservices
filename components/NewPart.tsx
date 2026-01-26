@@ -16,8 +16,10 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
     quantity: '',
     minStock: '',
     costPrice: '',
-    salePrice: ''
+    salePrice: '',
+    imageUrl: ''
   });
+  const [uploadingImage, setUploadingImage] = useState(false);
   const { showAlert } = useAlert();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -27,8 +29,41 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
     if (e.target.value) {
-      // Just formatting for display, does not affect state storage logic directly if we allow string parsing
-      // But keeping it simple
+      const val = parseFloat(e.target.value);
+      if (!isNaN(val)) {
+        setFormData(prev => ({ ...prev, [e.target.id]: val.toFixed(2) }));
+      }
+    }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files || e.target.files.length === 0) {
+      return;
+    }
+    const file = e.target.files[0];
+    try {
+      setUploadingImage(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('logos') // Using 'logos' bucket as it is confirmed to work; 'parts' might not exist
+        .upload(filePath, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: { publicUrl } } = supabase.storage.from('logos').getPublicUrl(filePath);
+
+      setFormData(prev => ({ ...prev, imageUrl: publicUrl }));
+      showAlert('Sucesso', 'Imagem enviada com sucesso!', 'success');
+    } catch (error: any) {
+      console.error('Error uploading image:', error);
+      showAlert('Erro', 'Erro ao enviar imagem: ' + error.message, 'error');
+    } finally {
+      setUploadingImage(false);
     }
   };
 
@@ -51,7 +86,7 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
         min_stock: parseInt(formData.minStock) || 0,
         cost_price: parseFloat(formData.costPrice) || 0,
         sale_price: parseFloat(formData.salePrice) || 0,
-        image_url: null // Placeholder
+        image_url: formData.imageUrl || null
       });
 
       if (error) throw error;
@@ -84,14 +119,29 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
           <h2 className="text-lg font-semibold mb-6 text-gray-900">Informações da Peça</h2>
 
           <div className="flex flex-col gap-5">
-            {/* Photo Upload (Placeholder) */}
+            {/* Photo Upload */}
             <div className="flex justify-center w-full">
               <div className="relative w-32 h-32 group">
-                <div className="w-full h-full bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center text-gray-400 shadow-sm transition-all group-hover:bg-gray-100 group-hover:border-primary/50 cursor-pointer">
-                  <span className="material-symbols-outlined text-3xl mb-1 group-hover:text-primary transition-colors">photo_camera</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wide group-hover:text-primary transition-colors">Adicionar Foto</span>
-                </div>
-                <input accept="image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" type="file" />
+                {/* Preview or Placeholder */}
+                {formData.imageUrl ? (
+                  <img src={formData.imageUrl} className="w-full h-full object-cover rounded-2xl border-2 border-gray-100" />
+                ) : (
+                  <div className="w-full h-full bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center text-gray-400 shadow-sm transition-all group-hover:bg-gray-100 group-hover:border-primary/50 cursor-pointer">
+                    <span className="material-symbols-outlined text-3xl mb-1 group-hover:text-primary transition-colors">photo_camera</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wide group-hover:text-primary transition-colors">Adicionar Foto</span>
+                  </div>
+                )}
+                <input
+                  accept="image/*"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  type="file"
+                  onChange={handleImageUpload}
+                />
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-white/80 flex items-center justify-center rounded-2xl z-10">
+                    <span className="material-symbols-outlined animate-spin text-primary">progress_activity</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -124,11 +174,8 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
                   <option value="acessorios">Acessórios em geral</option>
                   <option value="informatica">Informática</option>
                   <option value="outros">Outros</option>
-                  {/* Logic for new category would go here, omitting for simplicity in migration */}
                 </select>
-                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                  <span className="material-symbols-outlined">expand_more</span>
-                </div>
+                {/* Custom arrow removed to avoid duplication if native one shows */}
               </div>
             </div>
 
@@ -172,10 +219,10 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
                     id="costPrice"
                     value={formData.costPrice}
                     onChange={handleChange}
-                    placeholder="0.00"
-                    type="number"
-                    step="0.01"
                     onBlur={handleBlur}
+                    placeholder="0.00"
+                    type="text"
+                    inputMode="decimal"
                   />
                 </div>
               </div>
@@ -188,10 +235,10 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
                     id="salePrice"
                     value={formData.salePrice}
                     onChange={handleChange}
-                    placeholder="0.00"
-                    type="number"
-                    step="0.01"
                     onBlur={handleBlur}
+                    placeholder="0.00"
+                    type="text"
+                    inputMode="decimal"
                   />
                 </div>
               </div>

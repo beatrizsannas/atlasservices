@@ -63,38 +63,60 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
 
   const fetchDependencies = async () => {
     try {
-      const { data: clientsData } = await supabase.from('clients').select('*');
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error("User not found in NewAppointment fetchDependencies");
+        return;
+      }
+
+      const { data: clientsData } = await supabase.from('clients').select('*').order('name');
       if (clientsData) setClients(clientsData);
 
       const { data: servicesData } = await supabase.from('services').select('id, title, duration_minutes');
       if (servicesData) setServices(servicesData);
 
       // Fetch quotes
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: quotesData } = await supabase
+      const { data: quotesData, error: quotesError } = await supabase
         .from('quotes')
-        .select('id, client_id, total, status, created_at, clients(name)')
-        .eq('user_id', user?.id);
-      console.log('Quotes loaded:', quotesData);
+        .select('id, client_id, total_amount, status, created_at, clients(name)')
+        .eq('user_id', user.id);
 
-      let formattedQuotes: any[] = [];
+      if (quotesError) {
+        console.error('Error fetching quotes:', quotesError);
+      }
+
+      console.log('Quotes loaded raw:', quotesData);
+
       if (quotesData) {
-        console.log('Quote Data with Status:', quotesData.map((q: any) => ({ id: q.id, status: q.status })));
+        // Map quotes
+        const allQuotes = quotesData.map((q: any) => {
+          let statusLabel = 'Pendente';
+          let statusColor = 'bg-amber-50 text-amber-700 border-amber-100';
 
-        // Filter for approved quotes, case insensitive, and check for 'Aprovado' (user's language) or 'approved'
-        formattedQuotes = quotesData
-          .filter((q: any) => {
-            const s = q.status?.toLowerCase() || '';
-            return s === 'approved' || s === 'aprovado';
-          })
-          .map((q: any) => ({
+          if (q.status === 'approved' || q.status === 'aprovado') {
+            statusLabel = 'Aprovado';
+            statusColor = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+          } else if (q.status === 'cancelled' || q.status === 'cancelado') {
+            statusLabel = 'Cancelado';
+            statusColor = 'bg-gray-100 text-gray-600 border-gray-200';
+          } else if (q.status === 'expired' || q.status === 'expirado') {
+            statusLabel = 'Expirado';
+            statusColor = 'bg-red-50 text-red-700 border-red-100';
+          }
+
+          return {
             id: q.id,
-            title: `Orçamento #${q.id.substr(0, 8)} - ${q.clients?.name} (${q.total ? `R$ ${q.total}` : '-'})`,
+            title: `Orçamento #${q.id.substr(0, 8)} - ${statusLabel}`, // Simplified title for selected state
             client_id: q.client_id,
-            // Store raw quote object if needed or just id
+            total_amount: q.total_amount,
+            status: q.status,
+            statusLabel,
+            statusColor,
             original: q
-          }));
-        setQuotes(formattedQuotes);
+          };
+        });
+
+        setQuotes(allQuotes);
       }
 
     } catch (error) {
@@ -164,7 +186,7 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
         user_id: user.id,
         client_id: selectedClient.id,
         type: appointmentType, // 'service' or 'quote'
-        related_id: selectedItem?.id || null, // service_id or quote_id
+        related_id: selectedItem?.id || null, // Reverting to related_id as seen in Dashboard
         start_time: startDateTime,
         end_time: endDateTime,
         notes: notes,
@@ -179,6 +201,38 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
     } finally {
       setLoading(false);
     }
+  };
+
+  const debugSchema = async () => {
+    let report = 'Diagnóstico de Colunas:\n';
+
+    // Check related_id
+    try {
+      await supabase.from('appointments').select('related_id').limit(1);
+      report += '✅ related_id: Existe\n';
+    } catch (e: any) {
+      report += `❌ related_id: Erro (${e.message})\n`;
+    }
+
+    // Check service_id
+    try {
+      const { error } = await supabase.from('appointments').select('service_id').limit(1);
+      if (error) throw error;
+      report += '✅ service_id: Existe\n';
+    } catch (e: any) {
+      report += `❌ service_id: Erro (${e.message})\n`;
+    }
+
+    // Check quote_id
+    try {
+      const { error } = await supabase.from('appointments').select('quote_id').limit(1);
+      if (error) throw error;
+      report += '✅ quote_id: Existe\n';
+    } catch (e: any) {
+      report += `❌ quote_id: Erro (${e.message})\n`;
+    }
+
+    alert(report);
   };
 
 
@@ -405,23 +459,39 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
                       ))
                     ) : (
                       (() => {
-                        const filtered = quotes.filter(quote => !selectedClient || quote.client_id == selectedClient.id);
+                        const filtered = quotes.filter(quote => {
+                          if (!selectedClient) return true;
+                          return String(quote.client_id) === String(selectedClient.id);
+                        });
+
                         return filtered.length > 0 ? (
                           filtered.map((quote) => (
                             <button
                               key={quote.id}
-                              className="w-full text-left px-4 py-2.5 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                              className="w-full text-left px-4 py-3 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg border-b border-gray-50 last:border-0 flex justify-between items-center group"
                               onClick={() => {
                                 setSelectedItem(quote);
                                 setIsDropdownOpen(false);
                               }}
                             >
-                              {quote.title}
+                              <div className="flex flex-col">
+                                <span className="font-medium text-gray-900 group-hover:text-[#0B2A5B] transition-colors">
+                                  Orçamento #{quote.id.substr(0, 8)}
+                                </span>
+                                <span className="text-xs text-gray-500">
+                                  {quote.total_amount ? `R$ ${quote.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
+                                </span>
+                              </div>
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${quote.statusColor || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                                {quote.statusLabel || quote.status}
+                              </span>
                             </button>
                           ))
                         ) : (
-                          <div className="p-4 text-sm text-gray-500 text-center">
-                            {selectedClient ? 'Nenhum orçamento encontrado para este cliente' : 'Selecione um cliente para ver os orçamentos'}
+                          <div className="p-4 text-sm text-gray-500 text-center italic">
+                            {selectedClient ?
+                              'Nenhum orçamento encontrado para este cliente.' :
+                              'Selecione um cliente para ver os orçamentos'}
                           </div>
                         );
                       })()
@@ -504,6 +574,13 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
             ) : (
               'Confirmar Agendamento'
             )}
+          </button>
+
+          <button
+            onClick={debugSchema}
+            className="w-full mt-2 text-xs text-gray-400 underline p-2"
+          >
+            Diagnosticar Tabela (Debug)
           </button>
         </div>
 
