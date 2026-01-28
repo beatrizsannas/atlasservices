@@ -68,7 +68,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onNavigate })
         <div className="p-6 border-b border-gray-100 bg-background-light">
           <div className="flex items-center gap-4">
             <div
-              className="h-14 w-14 rounded-full bg-cover bg-center border-2 border-white shadow-md bg-gray-200 flex items-center justify-center text-[#111418] font-bold text-lg"
+              className="h-14 w-14 rounded-full bg-cover bg-center border-2 border-white shadow-md bg-white flex items-center justify-center text-[#111418] font-bold text-lg"
               style={profile.avatar_url ? { backgroundImage: `url("${profile.avatar_url}")` } : {}}
             >
               {!profile.avatar_url && getInitials(profile.name)}

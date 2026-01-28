@@ -14,6 +14,10 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack, clientId }) => {
     phone: '',
     email: '',
     address: '',
+    number: '',
+    neighborhood: '',
+    city: '',
+    state: '',
     notes: ''
   });
   const { showAlert } = useAlert();
@@ -40,6 +44,10 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack, clientId }) => {
           phone: data.phone || '',
           email: data.email || '',
           address: data.address || '',
+          number: data.number || '',
+          neighborhood: data.neighborhood || '',
+          city: data.city || '',
+          state: data.state || '',
           notes: data.notes || ''
         });
       }
@@ -80,6 +88,10 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack, clientId }) => {
             phone: formData.phone,
             email: formData.email,
             address: formData.address,
+            number: formData.number,
+            neighborhood: formData.neighborhood,
+            city: formData.city,
+            state: formData.state,
             notes: formData.notes
           })
           .eq('id', clientId);
@@ -94,6 +106,10 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack, clientId }) => {
           phone: formData.phone,
           email: formData.email,
           address: formData.address,
+          number: formData.number,
+          neighborhood: formData.neighborhood,
+          city: formData.city,
+          state: formData.state,
           notes: formData.notes
         });
 
@@ -170,18 +186,75 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack, clientId }) => {
             </div>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-semibold text-gray-700" htmlFor="address">Endereço</label>
-            <div className="relative">
-              <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">location_on</span>
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2 mt-2">Endereço</h3>
+
+            <div className="flex gap-3">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-gray-700" htmlFor="address">Logradouro (Rua/Av)</label>
+                <div className="relative">
+                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[18px]">location_on</span>
+                  <input
+                    className="w-full pl-9 pr-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
+                    id="address"
+                    value={formData.address}
+                    onChange={handleChange}
+                    placeholder="Rua Exemplo"
+                    type="text"
+                  />
+                </div>
+              </div>
+
+              <div className="w-1/3 flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-gray-700" htmlFor="number">Número</label>
+                <input
+                  className="w-full px-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
+                  id="number"
+                  value={formData.number}
+                  onChange={handleChange}
+                  placeholder="123"
+                  type="text"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-gray-700" htmlFor="neighborhood">Bairro</label>
               <input
-                className="w-full pl-10 pr-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
-                id="address"
-                value={formData.address}
+                className="w-full px-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
+                id="neighborhood"
+                value={formData.neighborhood}
                 onChange={handleChange}
-                placeholder="Rua, Número, Bairro"
+                placeholder="Bairro Central"
                 type="text"
               />
+            </div>
+
+            <div className="flex gap-3">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-gray-700" htmlFor="city">Cidade</label>
+                <input
+                  className="w-full px-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800"
+                  id="city"
+                  value={formData.city}
+                  onChange={handleChange}
+                  placeholder="Cidade"
+                  type="text"
+                />
+              </div>
+
+              <div className="w-1/3 flex flex-col gap-1.5">
+                <label className="text-xs font-semibold text-gray-700" htmlFor="state">UF</label>
+                <input
+                  className="w-full px-4 py-3 rounded-[16px] border border-gray-200 bg-white focus:ring-2 focus:ring-primary/20 focus:border-primary focus:outline-none placeholder-gray-400 text-sm transition-all text-gray-800 uppercase"
+                  id="state"
+                  value={formData.state}
+                  onChange={handleChange}
+                  placeholder="UF"
+                  maxLength={2}
+                  type="text"
+                />
+              </div>
             </div>
           </div>
 

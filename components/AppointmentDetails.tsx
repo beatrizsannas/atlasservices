@@ -178,8 +178,14 @@ export const AppointmentDetails: React.FC<AppointmentDetailsProps> = ({ appointm
                                 <div className="flex items-start gap-3">
                                     <span className="material-symbols-outlined text-[#637188] mt-0.5">location_on</span>
                                     <div>
-                                        <p className="text-[#111418] font-medium">{client.address || 'Endereço não informado'}</p>
-                                        <p className="text-xs text-[#637188]">{client.city ? `${client.city}, ${client.state}` : 'Cidade/UF não informados'}</p>
+                                        <p className="text-[#111418] font-medium">
+                                            {client.address}{client.number ? `, ${client.number}` : ''}
+                                            {client.neighborhood ? ` - ${client.neighborhood}` : ''}
+                                            {!client.address && !client.number && !client.neighborhood && 'Endereço não informado'}
+                                        </p>
+                                        <p className="text-xs text-[#637188]">
+                                            {client.city && client.state ? `${client.city}/${client.state}` : (client.city || client.state || 'Cidade/UF não informados')}
+                                        </p>
                                     </div>
                                 </div>
                             </div>

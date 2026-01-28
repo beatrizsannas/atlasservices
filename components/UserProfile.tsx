@@ -134,7 +134,7 @@ export const UserProfile: React.FC<UserProfileProps> = ({ onBack }) => {
                     <div className="relative group cursor-pointer">
                         {/* Avatar display - placeholder if empty */}
                         <div
-                            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-28 w-28 ring-4 ring-white shadow-md bg-gray-200 flex items-center justify-center text-[#111418] font-bold text-3xl"
+                            className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-28 w-28 ring-4 ring-white shadow-md bg-white flex items-center justify-center text-[#111418] font-bold text-3xl"
                             style={formData.avatar_url ? { backgroundImage: `url("${formData.avatar_url}")` } : {}}
                         >
                             {!formData.avatar_url && (formData.full_name ? getInitials(formData.full_name) : <span className="material-symbols-outlined text-4xl text-gray-400">person</span>)}
