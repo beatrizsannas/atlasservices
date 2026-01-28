@@ -25,12 +25,12 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onNavigate })
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', user.id).single();
+      const { data } = await supabase.from('profiles').select('full_name, avatar_url, role').eq('id', user.id).single();
 
       if (data) {
         setProfile({
           name: data.full_name || 'Usuário',
-          role: 'Freelancer', // Role isn't in DB yet, keeping static
+          role: data.role || 'Freelancer',
           avatar_url: data.avatar_url || ''
         });
       }

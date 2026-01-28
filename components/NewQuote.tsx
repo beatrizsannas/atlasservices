@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAlert } from '../contexts/AlertContext';
 
@@ -13,6 +13,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
   const [items, setItems] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [selectedClientId, setSelectedClientId] = useState('');
+  const [selectedClientName, setSelectedClientName] = useState('');
   const [validityDate, setValidityDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 15);
@@ -20,6 +21,18 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
   });
   const [loading, setLoading] = useState(false);
   const [fetchingDeps, setFetchingDeps] = useState(true);
+
+  // Search state
+  const [clientSearch, setClientSearch] = useState('');
+  const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const clientDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Calendar States
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [viewDate, setViewDate] = useState(new Date());
+  const [tempDate, setTempDate] = useState('');
+
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   // Add Item Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,6 +51,19 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
     }
   }, [quoteId]);
 
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(event.target as Node)) {
+        setIsClientDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   useEffect(() => {
     if (isModalOpen) {
       filterResults();
@@ -46,8 +72,10 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
 
   const fetchDependencies = async () => {
     try {
-      const { data: clientsData } = await supabase.from('clients').select('id, name');
-      if (clientsData) setClients(clientsData);
+      const { data: clientsData } = await supabase.from('clients').select('id, name').order('name');
+      if (clientsData) {
+        setClients(clientsData);
+      }
 
       const { data: servicesData } = await supabase.from('services').select('id, title, price, description');
       if (servicesData) setServicesList(servicesData);
@@ -70,7 +98,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
       // Fetch Quote
       const { data: quote, error: quoteError } = await supabase
         .from('quotes')
-        .select('*')
+        .select('*, clients(name)')
         .eq('id', quoteId)
         .single();
 
@@ -78,6 +106,10 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
 
       if (quote) {
         setSelectedClientId(quote.client_id);
+        if (quote.clients) {
+          setClientSearch(quote.clients.name);
+          setSelectedClientName(quote.clients.name);
+        }
         setValidityDate(quote.valid_until);
         setDiscount(quote.discount || 0);
       }
@@ -110,6 +142,74 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
       setLoading(false);
     }
   }
+
+  // ... (keeping existing helper functions)
+
+  // Calendar Helpers
+  const openCalendar = () => {
+    const initialDate = validityDate ? new Date(validityDate + 'T12:00:00') : new Date();
+    setViewDate(initialDate);
+    setTempDate(validityDate);
+    setIsCalendarOpen(true);
+  };
+
+  const handlePrevMonth = () => {
+    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1));
+  };
+
+  const handleDateSelect = (day: number, type: 'prev' | 'current' | 'next') => {
+    if (type !== 'current') return;
+
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth() + 1;
+    const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    setTempDate(dateStr);
+  };
+
+  const confirmDate = () => {
+    setValidityDate(tempDate);
+    setIsCalendarOpen(false);
+  };
+
+  const generateCalendarDays = () => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const days = [];
+
+    for (let i = firstDay - 1; i >= 0; i--) {
+      days.push({ day: daysInPrevMonth - i, type: 'prev' });
+    }
+
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({ day: i, type: 'current' });
+    }
+
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({ day: i, type: 'next' });
+    }
+
+    return days;
+  };
+
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    const [y, m, d] = dateString.split('-');
+    return `${d}/${m}/${y}`;
+  };
+
+  const filteredClients = clients.filter(c =>
+    c.name.toLowerCase().includes(clientSearch.toLowerCase())
+  );
 
   const filterResults = () => {
     if (modalTab === 'service') {
@@ -216,6 +316,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
 
     try {
       setLoading(true);
+      // ... (Rest of existing save logic uses selectedClientId, which is fine)
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -229,13 +330,13 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
           valid_until: validityDate,
           total_amount: total,
           discount: discount,
-          status: 'pending' // Reset to pending on edit? Or keep? Let's keep pending logic for now.
+          status: 'pending'
         }).eq('id', quoteId).select().single();
 
         if (error) throw error;
         quoteData = data;
 
-        // Delete existing items to replace with new ones (simple approach)
+        // Delete existing items
         const { error: deleteError } = await supabase.from('quote_items').delete().eq('quote_id', quoteId);
         if (deleteError) throw deleteError;
 
@@ -257,7 +358,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
       // 2. Create Quote Items
       const quoteItems = items.map(item => ({
         quote_id: quoteData.id,
-        item_type: item.origin, // service, part, custom
+        item_type: item.origin,
         description: item.name,
         quantity: item.quantity,
         unit_price: item.price,
@@ -268,7 +369,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
 
       if (itemsError) throw itemsError;
 
-      onGenerate(validityDate, quoteData.id); // Or navigate to view-quote with ID
+      onGenerate(validityDate, quoteData.id);
 
     } catch (error: any) {
       console.error('Error saving quote:', error);
@@ -294,35 +395,61 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
 
       <main className="pt-20 px-4 pb-32 flex flex-col gap-6">
         <section className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-4">
-          <div>
+          <div ref={clientDropdownRef}>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Cliente</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <span className="material-symbols-outlined text-gray-400 text-[20px]">search</span>
               </div>
-              <select
-                className="block w-full pl-10 pr-10 py-3 border-gray-200 rounded-lg bg-gray-50 focus:ring-[#0B2A5B] focus:border-[#0B2A5B] appearance-none text-sm outline-none"
-                value={selectedClientId}
-                onChange={(e) => setSelectedClientId(e.target.value)}
-              >
-                <option disabled value="">Buscar cliente...</option>
-                {clients.map(client => (
-                  <option key={client.id} value={client.id}>{client.name}</option>
-                ))}
-              </select>
+              <input
+                type="text"
+                placeholder="Buscar cliente..."
+                value={clientSearch}
+                onChange={(e) => {
+                  setClientSearch(e.target.value);
+                  if (selectedClientId && e.target.value !== selectedClientName) {
+                    setSelectedClientId(''); // Clear selection if typing
+                  }
+                  setIsClientDropdownOpen(true);
+                }}
+                onFocus={() => setIsClientDropdownOpen(true)}
+                className="block w-full pl-10 pr-10 py-3 border border-gray-200 rounded-lg bg-gray-50 focus:ring-[#0B2A5B] focus:border-[#0B2A5B] text-sm outline-none transition-all"
+              />
               <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                 <span className="material-symbols-outlined text-gray-400 text-[20px]">arrow_drop_down</span>
               </div>
+
+              {isClientDropdownOpen && filteredClients.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-30 max-h-48 overflow-y-auto">
+                  {filteredClients.map(client => (
+                    <button
+                      key={client.id}
+                      className="w-full text-left px-4 py-2 text-sm text-[#111418] hover:bg-gray-50 transition-colors"
+                      onClick={() => {
+                        setSelectedClientId(client.id);
+                        setSelectedClientName(client.name);
+                        setClientSearch(client.name);
+                        setIsClientDropdownOpen(false);
+                      }}
+                    >
+                      {client.name}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-1.5">Data de Validade</label>
-            <div className="relative">
+            <div className="relative cursor-pointer" onClick={openCalendar}>
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <span className="material-symbols-outlined text-gray-400 text-[20px]">calendar_today</span>
+              </div>
               <input
-                className="block w-full px-3 py-3 border-gray-200 rounded-lg bg-gray-50 focus:ring-[#0B2A5B] focus:border-[#0B2A5B] text-sm outline-none"
-                type="date"
-                value={validityDate}
-                onChange={(e) => setValidityDate(e.target.value)}
+                className="block w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg bg-gray-50 focus:ring-[#0B2A5B] focus:border-[#0B2A5B] text-sm outline-none cursor-pointer"
+                type="text"
+                readOnly
+                value={formatDate(validityDate)}
               />
             </div>
           </div>
@@ -560,6 +687,70 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
           </div>
         </div>
       )}
-    </div>
+
+      {/* Calendar Modal */}
+      {
+        isCalendarOpen && (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm transition-all" onClick={() => setIsCalendarOpen(false)}></div>
+            <div className="relative w-full max-w-[340px] bg-white rounded-3xl shadow-2xl p-6 flex flex-col gap-4 animate-in fade-in zoom-in duration-300">
+              <div className="flex items-center justify-between py-2">
+                <button onClick={handlePrevMonth} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
+                  <span className="material-symbols-outlined text-[20px]">chevron_left</span>
+                </button>
+                <h3 className="text-base font-bold text-[#111418] capitalize">
+                  {monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}
+                </h3>
+                <button onClick={handleNextMonth} className="p-2 rounded-full hover:bg-gray-100 text-gray-500 transition-colors">
+                  <span className="material-symbols-outlined text-[20px]">chevron_right</span>
+                </button>
+              </div>
+              <div className="flex flex-col gap-2">
+                <div className="grid grid-cols-7 text-center">
+                  <span className="text-xs font-bold text-gray-400">D</span>
+                  <span className="text-xs font-bold text-gray-400">S</span>
+                  <span className="text-xs font-bold text-gray-400">T</span>
+                  <span className="text-xs font-bold text-gray-400">Q</span>
+                  <span className="text-xs font-bold text-gray-400">Q</span>
+                  <span className="text-xs font-bold text-gray-400">S</span>
+                  <span className="text-xs font-bold text-gray-400">S</span>
+                </div>
+                <div className="grid grid-cols-7 gap-y-1 gap-x-1 text-center">
+                  {generateCalendarDays().map((dayObj, index) => {
+                    const isSelected = tempDate &&
+                      dayObj.type === 'current' &&
+                      parseInt(tempDate.split('-')[2]) === dayObj.day &&
+                      parseInt(tempDate.split('-')[1]) === (viewDate.getMonth() + 1) &&
+                      parseInt(tempDate.split('-')[0]) === viewDate.getFullYear();
+
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => handleDateSelect(dayObj.day, dayObj.type as any)}
+                        className={`
+                          h-9 w-9 flex items-center justify-center rounded-full text-sm transition-colors
+                          ${dayObj.type === 'current' ? 'text-[#111418] hover:bg-gray-100' : 'text-gray-300'}
+                          ${isSelected ? '!bg-[#0B2A5B] !text-white !font-bold shadow-md' : ''}
+                        `}
+                      >
+                        {dayObj.day}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="flex items-center gap-3 pt-4 border-t border-gray-100">
+                <button onClick={() => setIsCalendarOpen(false)} className="flex-1 py-3 rounded-xl border border-[#0B2A5B]/20 text-[#0B2A5B] font-semibold text-sm hover:bg-blue-50 transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={confirmDate} className="flex-1 py-3 rounded-xl bg-[#0B2A5B] text-white font-semibold text-sm hover:bg-[#09224a] transition-all shadow-lg">
+                  Confirmar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 };

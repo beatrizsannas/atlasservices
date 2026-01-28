@@ -11,6 +11,7 @@ export const CompanyDetails: React.FC<CompanyDetailsProps> = ({ onBack }) => {
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     company_name: '',
+    role: '',
     cnpj: '',
     professional_id: '',
     company_phone: '',
@@ -67,13 +68,14 @@ export const CompanyDetails: React.FC<CompanyDetailsProps> = ({ onBack }) => {
 
       const { data, error } = await supabase
         .from('profiles')
-        .select('company_name, cnpj, professional_id, company_phone, company_email, address, quote_notes, avatar_url')
+        .select('company_name, role, cnpj, professional_id, company_phone, company_email, address, quote_notes, avatar_url')
         .eq('id', user.id)
         .single();
 
       if (data) {
         setFormData({
           company_name: data.company_name || '',
+          role: data.role || '',
           cnpj: data.cnpj || '',
           professional_id: data.professional_id || '',
           company_phone: data.company_phone || '',
@@ -185,6 +187,15 @@ export const CompanyDetails: React.FC<CompanyDetailsProps> = ({ onBack }) => {
               type="text"
               name="cnpj"
               value={formData.cnpj}
+              onChange={handleChange}
+            />
+
+            <InputGroup
+              label="Cargo / Função"
+              placeholder="Ex: Gerente, CEO, Freelancer"
+              type="text"
+              name="role"
+              value={formData.role}
               onChange={handleChange}
             />
 

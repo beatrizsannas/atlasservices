@@ -1,17 +1,16 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { Screen } from '../App';
 import { supabase } from '../supabaseClient';
+import { useCache } from '../contexts/CacheContext';
 
 interface DashboardProps {
   onNavigate: (screen: Screen) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const [scheduledCount, setScheduledCount] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
-  const [monthlyStats, setMonthlyStats] = useState<{ label: string, count: number, fullDate: string }[]>([]);
-  const [agendaItems, setAgendaItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { dashboardData, setDashboardData } = useCache();
+  // If we have data, we are not loading (visually), but we might be refreshing in bg
+  const loading = !dashboardData;
 
   useEffect(() => {
     fetchDashboardData();
@@ -19,7 +18,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   const fetchDashboardData = async () => {
     try {
-      setLoading(true);
+      // If no cache, we might want to show spinner, but 'loading' derived state handles that.
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
@@ -40,89 +39,88 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const ed = String(endOfMonth.getDate()).padStart(2, '0');
       const endOfMonthStr = `${endOfMonth.getFullYear()}-${em}-${ed}`;
 
-      // 1. Daily Summary: Scheduled Today
-      const { count: scheduledToday } = await supabase
-        .from('appointments')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .eq('date', todayStr)
-        .eq('status', 'scheduled')
-        .neq('status', 'deleted');
-
-      setScheduledCount(scheduledToday || 0);
-
-      // 2. Monthly Summary: Completed This Month
-      const { count: completedMonth } = await supabase
-        .from('appointments')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user.id)
-        .gte('date', startOfMonthStr)
-        .lte('date', endOfMonthStr)
-        .eq('status', 'completed')
-        .neq('status', 'deleted');
-
-      setCompletedCount(completedMonth || 0);
-
-      // 3. Monthly Progress (Yearly Data)
       const startOfYearStr = `${year}-01-01`;
       const endOfYearStr = `${year}-12-31`;
 
-      const { data: yearCompleted, error: yearError } = await supabase
-        .from('appointments')
-        .select('id, date')
-        .eq('user_id', user.id)
-        .gte('date', startOfYearStr)
-        .lte('date', endOfYearStr)
-        .eq('status', 'completed')
-        .neq('status', 'deleted');
+      // Parallelize requests
+      const [scheduledRes, completedMonthRes, yearCompletedRes, agendaRes] = await Promise.all([
+        // 1. Daily Summary: Scheduled Today
+        supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('date', todayStr)
+          .eq('status', 'scheduled')
+          .neq('status', 'deleted'),
 
-      if (yearError) {
-        console.error('Error fetching yearly stats:', yearError);
-      }
+        // 2. Monthly Summary: Completed This Month
+        supabase
+          .from('appointments')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .gte('date', startOfMonthStr)
+          .lte('date', endOfMonthStr)
+          .eq('status', 'completed')
+          .neq('status', 'deleted'),
 
-      if (yearCompleted) {
+        // 3. Monthly Progress (Yearly Data)
+        supabase
+          .from('appointments')
+          .select('id, date')
+          .eq('user_id', user.id)
+          .gte('date', startOfYearStr)
+          .lte('date', endOfYearStr)
+          .eq('status', 'completed')
+          .neq('status', 'deleted'),
+
+        // 4. Agenda: Today's Appointments
+        supabase
+          .from('appointments')
+          .select(`
+                    id,
+                    date,
+                    title,
+                    start_time,
+                    status,
+                    type,
+                    clients (name)
+                `)
+          .eq('user_id', user.id)
+          .eq('date', todayStr)
+          .neq('status', 'deleted')
+          .order('start_time', { ascending: true })
+          .limit(5)
+      ]);
+
+      // Process Results
+      const scheduledCount = scheduledRes.count || 0;
+      const completedCount = completedMonthRes.count || 0;
+
+      // Process Monthly Stats
+      let monthlyStats: { label: string, count: number, fullDate: string }[] = [];
+      if (yearCompletedRes.data) {
         const counts = Array(12).fill(0);
-        yearCompleted.forEach((app: any) => {
-          // app.date is YYYY-MM-DD
+        yearCompletedRes.data.forEach((app: any) => {
           if (!app.date) return;
           const parts = app.date.split('-');
           if (parts.length > 1) {
-            const mIndex = parseInt(parts[1], 10) - 1; // 0-11
+            const mIndex = parseInt(parts[1], 10) - 1;
             if (mIndex >= 0 && mIndex < 12) counts[mIndex]++;
           }
         });
 
         const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-        const stats = monthLabels.map((label, idx) => ({
+        monthlyStats = monthLabels.map((label, idx) => ({
           label,
           count: counts[idx],
           fullDate: new Date(year, idx, 1).toISOString()
-        }));
-
-        // Show first 6 months or window? Let's show first 4 to match UI mockup roughly, but dynamic
-        setMonthlyStats(stats.slice(0, 6));
+        })).slice(0, 6);
       }
 
-      // 4. Agenda: Today's Appointments
-      const { data: agendaData } = await supabase
-        .from('appointments')
-        .select(`
-                id,
-                date,
-                title,
-                start_time,
-                status,
-                type,
-                clients (name)
-            `)
-        .eq('user_id', user.id)
-        .eq('date', todayStr)
-        .neq('status', 'deleted')
-        .order('start_time', { ascending: true })
-        .limit(5);
-
-      if (agendaData) {
-        const items = await Promise.all(agendaData.map(async (app: any) => {
+      // Process Agenda
+      let agendaItems: any[] = [];
+      if (agendaRes.data) {
+        agendaItems = agendaRes.data.map((app: any) => {
           const serviceName = app.title || (app.type === 'quote' ? 'Orçamento' : 'Serviço');
 
           let statusLabel = 'Agendado';
@@ -143,24 +141,33 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             status: statusLabel,
             statusColor: statusColor
           }
-        }));
-        setAgendaItems(items);
+        });
       }
+
+      // Update Cache
+      setDashboardData({
+        scheduled: scheduledCount,
+        completed: completedCount,
+        monthlyStats,
+        agendaItems,
+        lastUpdated: Date.now()
+      });
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-    } finally {
-      setLoading(false);
     }
   }
 
   const today = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 
+  // Use values from cache or defaults if loading (though usually loading state is handled by not rendering or showing skeleton if needed, but here we just show what we have or empty)
+  const stats = dashboardData || { scheduled: 0, completed: 0, monthlyStats: [], agendaItems: [] };
+
   return (
     <>
-      <DailySummary date={today} scheduled={scheduledCount} completed={completedCount} />
-      <MonthlyProgress onNavigate={onNavigate} data={monthlyStats} />
-      <DailyAgenda date={today} items={agendaItems} loading={loading} />
+      <DailySummary date={today} scheduled={stats.scheduled} completed={stats.completed} />
+      <MonthlyProgress onNavigate={onNavigate} data={stats.monthlyStats} />
+      <DailyAgenda date={today} items={stats.agendaItems} loading={loading} />
     </>
   );
 };

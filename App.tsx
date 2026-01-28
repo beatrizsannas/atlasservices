@@ -42,6 +42,7 @@ import { Welcome } from './components/Welcome';
 import { SignUpSuccess } from './components/SignUpSuccess';
 import { Reschedule } from './components/Reschedule';
 import { MonthlyProgressScreen } from './components/MonthlyProgressScreen';
+import { CacheProvider } from './contexts/CacheContext';
 
 export type Screen = 'dashboard' | 'clients' | 'client-details' | 'inventory' | 'quotes' | 'new-quote' | 'quote-add-item' | 'quote-item-avulso' | 'quote-select-service' | 'quote-select-equipment' | 'view-quote' | 'schedule' | 'settings' | 'premium' | 'new-part' | 'new-category' | 'company-details' | 'user-profile' | 'new-appointment' | 'new-client' | 'services' | 'new-service' | 'edit-service' | 'appointment-details' | 'finance' | 'new-transaction' | 'advanced-filter' | 'login' | 'signup' | 'forgot-password' | 'email-sent-success' | 'email-sent-error' | 'new-password' | 'welcome' | 'signup-success' | 'reschedule' | 'monthly-progress';
 
@@ -54,15 +55,6 @@ const App: React.FC = () => {
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
   const [currentClientId, setCurrentClientId] = useState<string | null>(null);
   const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
-
-  // ... (existing code)
-
-  // ... (existing code)
-
-  // ... (existing code, updating Clients and NewClient props)
-
-
-
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
   const [currentPartId, setCurrentPartId] = useState<string | null>(null);
@@ -147,276 +139,278 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background-light relative">
-      {!isAuthScreen && (
-        <Sidebar
-          isOpen={isSidebarOpen}
-          onClose={closeSidebar}
-          onNavigate={handleNavigate}
-        />
-      )}
+    <CacheProvider>
+      <div className="min-h-screen bg-background-light relative">
+        {!isAuthScreen && (
+          <Sidebar
+            isOpen={isSidebarOpen}
+            onClose={closeSidebar}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentScreen === 'welcome' && (
-        <Welcome onNavigate={handleNavigate} />
-      )}
+        {currentScreen === 'welcome' && (
+          <Welcome onNavigate={handleNavigate} />
+        )}
 
-      {currentScreen === 'login' && (
-        <Login onNavigate={handleNavigate} />
-      )}
+        {currentScreen === 'login' && (
+          <Login onNavigate={handleNavigate} />
+        )}
 
-      {currentScreen === 'signup' && (
-        <SignUp onNavigate={handleNavigate} />
-      )}
+        {currentScreen === 'signup' && (
+          <SignUp onNavigate={handleNavigate} />
+        )}
 
-      {currentScreen === 'signup-success' && (
-        <SignUpSuccess onNavigate={handleNavigate} />
-      )}
+        {currentScreen === 'signup-success' && (
+          <SignUpSuccess onNavigate={handleNavigate} />
+        )}
 
-      {currentScreen === 'forgot-password' && (
-        <ForgotPassword onNavigate={handleNavigate} />
-      )}
+        {currentScreen === 'forgot-password' && (
+          <ForgotPassword onNavigate={handleNavigate} />
+        )}
 
-      {currentScreen === 'email-sent-success' && (
-        <EmailSentSuccess onNavigate={handleNavigate} />
-      )}
+        {currentScreen === 'email-sent-success' && (
+          <EmailSentSuccess onNavigate={handleNavigate} />
+        )}
 
-      {currentScreen === 'email-sent-error' && (
-        <EmailSentError onNavigate={handleNavigate} />
-      )}
+        {currentScreen === 'email-sent-error' && (
+          <EmailSentError onNavigate={handleNavigate} />
+        )}
 
-      {currentScreen === 'new-password' && (
-        <NewPassword onNavigate={handleNavigate} />
-      )}
+        {currentScreen === 'new-password' && (
+          <NewPassword onNavigate={handleNavigate} />
+        )}
 
-      {currentScreen === 'reschedule' && (
-        <Reschedule onBack={() => handleNavigate('schedule')} />
-      )}
+        {currentScreen === 'reschedule' && (
+          <Reschedule onBack={() => handleNavigate('schedule')} />
+        )}
 
-      {currentScreen === 'dashboard' && (
-        <>
-          <Header onProfileClick={toggleSidebar} />
-          <main className="flex flex-col gap-6 px-4 pt-6 pb-32">
-            <Dashboard onNavigate={handleNavigate} />
-          </main>
-        </>
-      )}
+        {currentScreen === 'dashboard' && (
+          <>
+            <Header onProfileClick={toggleSidebar} />
+            <main className="flex flex-col gap-6 px-4 pt-6 pb-32">
+              <Dashboard onNavigate={handleNavigate} />
+            </main>
+          </>
+        )}
 
-      {currentScreen === 'monthly-progress' && (
-        <MonthlyProgressScreen
-          onBack={() => handleNavigate('dashboard')}
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentScreen === 'monthly-progress' && (
+          <MonthlyProgressScreen
+            onBack={() => handleNavigate('dashboard')}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentScreen === 'schedule' && (
-        <Schedule
-          onNewAppointment={() => handleNavigate('new-appointment')}
-          onAppointmentClick={(id) => handleViewAppointment(id)}
-          onReschedule={() => handleNavigate('reschedule')}
-          onBack={() => handleNavigate('dashboard')}
-        />
-      )}
+        {currentScreen === 'schedule' && (
+          <Schedule
+            onNewAppointment={() => handleNavigate('new-appointment')}
+            onAppointmentClick={(id) => handleViewAppointment(id)}
+            onReschedule={() => handleNavigate('reschedule')}
+            onBack={() => handleNavigate('dashboard')}
+          />
+        )}
 
-      {currentScreen === 'new-appointment' && (
-        <NewAppointment
-          onBack={() => {
-            setCurrentQuoteId(null); // Clear quote ID on back
-            handleNavigate('schedule');
-          }}
-          initialQuoteId={currentQuoteId}
-        />
-      )}
+        {currentScreen === 'new-appointment' && (
+          <NewAppointment
+            onBack={() => {
+              setCurrentQuoteId(null); // Clear quote ID on back
+              handleNavigate('schedule');
+            }}
+            initialQuoteId={currentQuoteId}
+          />
+        )}
 
-      {currentScreen === 'appointment-details' && (
-        <AppointmentDetails
-          appointmentId={currentAppointmentId}
-          onBack={() => handleNavigate('schedule')}
-          onReschedule={() => handleNavigate('reschedule')}
-        />
-      )}
+        {currentScreen === 'appointment-details' && (
+          <AppointmentDetails
+            appointmentId={currentAppointmentId}
+            onBack={() => handleNavigate('schedule')}
+            onReschedule={() => handleNavigate('reschedule')}
+          />
+        )}
 
-      {currentScreen === 'clients' && (
-        <Clients
-          onClientClick={(id) => {
-            setCurrentClientId(id);
-            handleNavigate('client-details');
-          }}
-          onBack={() => handleNavigate('dashboard')}
-          onNewClient={handleNewClient}
-          onEditClient={handleEditClient}
-        />
-      )}
+        {currentScreen === 'clients' && (
+          <Clients
+            onClientClick={(id) => {
+              setCurrentClientId(id);
+              handleNavigate('client-details');
+            }}
+            onBack={() => handleNavigate('dashboard')}
+            onNewClient={handleNewClient}
+            onEditClient={handleEditClient}
+          />
+        )}
 
-      {currentScreen === 'new-client' && (
-        <NewClient
-          onBack={() => handleNavigate('clients')}
-          clientId={currentClientId}
-        />
-      )}
+        {currentScreen === 'new-client' && (
+          <NewClient
+            onBack={() => handleNavigate('clients')}
+            clientId={currentClientId}
+          />
+        )}
 
-      {currentScreen === 'client-details' && (
-        <ClientDetails
-          onBack={() => handleNavigate('clients')}
-          clientId={currentClientId}
-        />
-      )}
+        {currentScreen === 'client-details' && (
+          <ClientDetails
+            onBack={() => handleNavigate('clients')}
+            clientId={currentClientId}
+          />
+        )}
 
-      {currentScreen === 'inventory' && (
-        <Inventory
-          onBack={() => handleNavigate('dashboard')}
-          onNewPart={handleNewPart}
-          onEditPart={handleEditPart}
-        />
-      )}
+        {currentScreen === 'inventory' && (
+          <Inventory
+            onBack={() => handleNavigate('dashboard')}
+            onNewPart={handleNewPart}
+            onEditPart={handleEditPart}
+          />
+        )}
 
-      {currentScreen === 'new-part' && (
-        <NewPart
-          onBack={() => {
-            setCurrentPartId(null);
-            handleNavigate('inventory');
-          }}
-          onNavigate={handleNavigate}
-          partId={currentPartId}
-        />
-      )}
+        {currentScreen === 'new-part' && (
+          <NewPart
+            onBack={() => {
+              setCurrentPartId(null);
+              handleNavigate('inventory');
+            }}
+            onNavigate={handleNavigate}
+            partId={currentPartId}
+          />
+        )}
 
-      {currentScreen === 'new-category' && (
-        <NewCategory onBack={() => handleNavigate('new-part')} />
-      )}
+        {currentScreen === 'new-category' && (
+          <NewCategory onBack={() => handleNavigate('new-part')} />
+        )}
 
-      {currentScreen === 'quotes' && (
-        <Quotes
-          onBack={() => handleNavigate('dashboard')}
-          onNewQuote={handleNewQuote}
-          onFilter={() => handleNavigate('advanced-filter')}
-          onEditQuote={handleEditQuote}
-          onViewQuote={handleViewQuote}
-          onScheduleQuote={(quoteId) => {
-            setCurrentQuoteId(quoteId);
-            handleNavigate('new-appointment');
-          }}
-        />
-      )}
+        {currentScreen === 'quotes' && (
+          <Quotes
+            onBack={() => handleNavigate('dashboard')}
+            onNewQuote={handleNewQuote}
+            onFilter={() => handleNavigate('advanced-filter')}
+            onEditQuote={handleEditQuote}
+            onViewQuote={handleViewQuote}
+            onScheduleQuote={(quoteId) => {
+              setCurrentQuoteId(quoteId);
+              handleNavigate('new-appointment');
+            }}
+          />
+        )}
 
-      {currentScreen === 'new-quote' && (
-        <NewQuote
-          quoteId={currentQuoteId}
-          onBack={() => handleNavigate('quotes')}
-          onGenerate={(date: string, quoteId?: string) => {
-            setQuoteValidityDate(date);
-            if (quoteId) setCurrentQuoteId(quoteId);
-            handleNavigate('view-quote');
-          }}
-          onAdd={() => handleNavigate('quote-add-item')}
-        />
-      )}
+        {currentScreen === 'new-quote' && (
+          <NewQuote
+            quoteId={currentQuoteId}
+            onBack={() => handleNavigate('quotes')}
+            onGenerate={(date: string, quoteId?: string) => {
+              setQuoteValidityDate(date);
+              if (quoteId) setCurrentQuoteId(quoteId);
+              handleNavigate('view-quote');
+            }}
+            onAdd={() => handleNavigate('quote-add-item')}
+          />
+        )}
 
-      {currentScreen === 'quote-add-item' && (
-        <QuoteAddItem
-          onBack={() => handleNavigate('quotes')}
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentScreen === 'quote-add-item' && (
+          <QuoteAddItem
+            onBack={() => handleNavigate('quotes')}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentScreen === 'quote-item-avulso' && (
-        <QuoteItemAvulso onBack={() => handleNavigate('quote-add-item')} />
-      )}
+        {currentScreen === 'quote-item-avulso' && (
+          <QuoteItemAvulso onBack={() => handleNavigate('quote-add-item')} />
+        )}
 
-      {currentScreen === 'quote-select-service' && (
-        <QuoteSelectService onBack={() => handleNavigate('quote-add-item')} />
-      )}
+        {currentScreen === 'quote-select-service' && (
+          <QuoteSelectService onBack={() => handleNavigate('quote-add-item')} />
+        )}
 
-      {currentScreen === 'quote-select-equipment' && (
-        <QuoteSelectEquipment onBack={() => handleNavigate('quote-add-item')} />
-      )}
+        {currentScreen === 'quote-select-equipment' && (
+          <QuoteSelectEquipment onBack={() => handleNavigate('quote-add-item')} />
+        )}
 
-      {currentScreen === 'view-quote' && (
-        <ViewQuote
-          onBack={() => handleNavigate('quotes')}
-          validityDate={quoteValidityDate}
-          quoteId={currentQuoteId || undefined}
-          onEdit={handleEditQuote}
-        />
-      )}
+        {currentScreen === 'view-quote' && (
+          <ViewQuote
+            onBack={() => handleNavigate('quotes')}
+            validityDate={quoteValidityDate}
+            quoteId={currentQuoteId || undefined}
+            onEdit={handleEditQuote}
+          />
+        )}
 
-      {currentScreen === 'advanced-filter' && (
-        <AdvancedFilter
-          onBack={() => handleNavigate('quotes')}
-          onApply={() => handleNavigate('quotes')}
-        />
-      )}
+        {currentScreen === 'advanced-filter' && (
+          <AdvancedFilter
+            onBack={() => handleNavigate('quotes')}
+            onApply={() => handleNavigate('quotes')}
+          />
+        )}
 
-      {currentScreen === 'services' && (
-        <Services
-          onBack={() => handleNavigate('dashboard')}
-          onNewService={() => handleNavigate('new-service')}
-          onEditService={(service) => {
-            setServiceToEdit(service);
-            handleNavigate('edit-service');
-          }}
-        />
-      )}
+        {currentScreen === 'services' && (
+          <Services
+            onBack={() => handleNavigate('dashboard')}
+            onNewService={() => handleNavigate('new-service')}
+            onEditService={(service) => {
+              setServiceToEdit(service);
+              handleNavigate('edit-service');
+            }}
+          />
+        )}
 
-      {currentScreen === 'new-service' && (
-        <NewService onBack={() => handleNavigate('services')} />
-      )}
+        {currentScreen === 'new-service' && (
+          <NewService onBack={() => handleNavigate('services')} />
+        )}
 
-      {currentScreen === 'edit-service' && (
-        <EditService
-          onBack={() => {
-            setServiceToEdit(null);
-            handleNavigate('services');
-          }}
-          service={serviceToEdit}
-        />
-      )}
+        {currentScreen === 'edit-service' && (
+          <EditService
+            onBack={() => {
+              setServiceToEdit(null);
+              handleNavigate('services');
+            }}
+            service={serviceToEdit}
+          />
+        )}
 
-      {currentScreen === 'finance' && (
-        <Finance
-          onBack={() => handleNavigate('dashboard')}
-          onNewTransaction={() => handleNavigate('new-transaction')}
-        />
-      )}
+        {currentScreen === 'finance' && (
+          <Finance
+            onBack={() => handleNavigate('dashboard')}
+            onNewTransaction={() => handleNavigate('new-transaction')}
+          />
+        )}
 
-      {currentScreen === 'new-transaction' && (
-        <NewTransaction onBack={() => handleNavigate('finance')} />
-      )}
+        {currentScreen === 'new-transaction' && (
+          <NewTransaction onBack={() => handleNavigate('finance')} />
+        )}
 
-      {currentScreen === 'settings' && (
-        <Settings
-          onBack={() => handleNavigate('dashboard')}
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentScreen === 'settings' && (
+          <Settings
+            onBack={() => handleNavigate('dashboard')}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentScreen === 'premium' && (
-        <Premium onBack={() => handleNavigate('settings')} />
-      )}
+        {currentScreen === 'premium' && (
+          <Premium onBack={() => handleNavigate('settings')} />
+        )}
 
-      {currentScreen === 'company-details' && (
-        <CompanyDetails onBack={() => handleNavigate('settings')} />
-      )}
+        {currentScreen === 'company-details' && (
+          <CompanyDetails onBack={() => handleNavigate('settings')} />
+        )}
 
-      {currentScreen === 'user-profile' && (
-        <UserProfile onBack={() => handleNavigate('settings')} />
-      )}
+        {currentScreen === 'user-profile' && (
+          <UserProfile onBack={() => handleNavigate('settings')} />
+        )}
 
-      {!isAuthScreen && (
-        <QuickActions
-          isOpen={isQuickActionsOpen}
-          onClose={() => setIsQuickActionsOpen(false)}
-          onNavigate={handleNavigate}
-        />
-      )}
+        {!isAuthScreen && (
+          <QuickActions
+            isOpen={isQuickActionsOpen}
+            onClose={() => setIsQuickActionsOpen(false)}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {!isAuthScreen && currentScreen !== 'view-quote' && currentScreen !== 'new-quote' && currentScreen !== 'premium' && currentScreen !== 'new-part' && currentScreen !== 'new-category' && currentScreen !== 'company-details' && currentScreen !== 'user-profile' && currentScreen !== 'new-appointment' && currentScreen !== 'new-client' && currentScreen !== 'services' && currentScreen !== 'new-service' && currentScreen !== 'edit-service' && currentScreen !== 'appointment-details' && currentScreen !== 'new-transaction' && currentScreen !== 'schedule' && currentScreen !== 'clients' && currentScreen !== 'settings' && currentScreen !== 'quote-add-item' && currentScreen !== 'quote-item-avulso' && currentScreen !== 'quote-select-service' && currentScreen !== 'quote-select-equipment' && currentScreen !== 'advanced-filter' && currentScreen !== 'monthly-progress' && currentScreen !== 'quotes' && (
-        <BottomNav
-          currentScreen={currentScreen}
-          onNavigate={handleNavigate}
-          onOpenQuickActions={() => setIsQuickActionsOpen(true)}
-        />
-      )}
-    </div>
+        {!isAuthScreen && currentScreen !== 'view-quote' && currentScreen !== 'new-quote' && currentScreen !== 'premium' && currentScreen !== 'new-part' && currentScreen !== 'new-category' && currentScreen !== 'company-details' && currentScreen !== 'user-profile' && currentScreen !== 'new-appointment' && currentScreen !== 'new-client' && currentScreen !== 'services' && currentScreen !== 'new-service' && currentScreen !== 'edit-service' && currentScreen !== 'appointment-details' && currentScreen !== 'new-transaction' && currentScreen !== 'schedule' && currentScreen !== 'clients' && currentScreen !== 'settings' && currentScreen !== 'quote-add-item' && currentScreen !== 'quote-item-avulso' && currentScreen !== 'quote-select-service' && currentScreen !== 'quote-select-equipment' && currentScreen !== 'advanced-filter' && currentScreen !== 'monthly-progress' && currentScreen !== 'quotes' && (
+          <BottomNav
+            currentScreen={currentScreen}
+            onNavigate={handleNavigate}
+            onOpenQuickActions={() => setIsQuickActionsOpen(true)}
+          />
+        )}
+      </div>
+    </CacheProvider>
   );
 }
 export default App;

@@ -219,7 +219,10 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
 
                   {/* Dropdown Menu */}
                   {activeMenuQuoteId === quote.id && (
-                    <div className="absolute top-8 right-0 bg-white rounded-xl shadow-xl py-2 w-48 z-10 border border-gray-100 animate-in fade-in zoom-in-95 duration-100">
+                    <div
+                      className="absolute top-8 right-0 bg-white rounded-xl shadow-xl py-2 w-48 z-10 border border-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
