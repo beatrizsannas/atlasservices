@@ -200,98 +200,102 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
           filteredQuotes.map((quote) => (
             <div
               key={quote.id}
-              className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 relative z-auto cursor-pointer active:scale-[0.99] transition-transform"
-              onClick={() => handleCardClick(quote.id)}
+              className="bg-white rounded-xl shadow-sm border border-gray-100 relative active:scale-[0.99] transition-transform"
             >
-              <div className="flex justify-between items-start">
-                <div className="flex flex-col">
+              {/* Main Clickable Area (Everything except top right menu area) */}
+              <div
+                className="p-4 pr-12 cursor-pointer"
+                onClick={() => handleCardClick(quote.id)}
+              >
+                <div className="flex flex-col gap-1 mb-4">
                   <h3 className="font-bold text-[#111418] text-base">{quote.client}</h3>
-                  <span className="text-xs text-gray-500 mt-0.5">Criado em {quote.date}</span>
+                  <span className="text-xs text-gray-500">Criado em {quote.date}</span>
                 </div>
-                <div className="relative">
-                  {/* Menu Trigger */}
-                  <button
-                    onClick={(e) => toggleMenu(e, quote.id)}
-                    className="h-8 w-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-400"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">more_vert</span>
-                  </button>
 
-                  {/* Dropdown Menu */}
-                  {activeMenuQuoteId === quote.id && (
-                    <div
-                      className="absolute top-8 right-0 bg-white rounded-xl shadow-xl py-2 w-48 z-10 border border-gray-100 animate-in fade-in zoom-in-95 duration-100"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUpdateStatus(quote.id, 'approved');
-                          setActiveMenuQuoteId(null);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 flex items-center gap-3 transition-colors font-medium text-sm"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">check_circle</span>
-                        Aprovar
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onScheduleQuote) onScheduleQuote(quote.id);
-                          setActiveMenuQuoteId(null);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-purple-50 text-gray-700 hover:text-purple-700 flex items-center gap-3 transition-colors font-medium text-sm"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">event</span>
-                        Agendar
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onEditQuote) onEditQuote(quote.id);
-                          setActiveMenuQuoteId(null);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-blue-50 text-gray-700 hover:text-blue-700 flex items-center gap-3 transition-colors font-medium text-sm"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">edit</span>
-                        Editar
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleUpdateStatus(quote.id, 'cancelled');
-                          setActiveMenuQuoteId(null);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-gray-100 text-gray-700 hover:text-gray-900 flex items-center gap-3 transition-colors font-medium text-sm"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">cancel</span>
-                        Cancelar
-                      </button>
-                      <div className="my-1 border-t border-gray-100"></div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(quote.id);
-                          setActiveMenuQuoteId(null);
-                        }}
-                        className="w-full px-4 py-3 text-left hover:bg-red-50 text-red-600 flex items-center gap-3 transition-colors font-medium text-sm"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">delete</span>
-                        Excluir
-                      </button>
-                    </div>
-                  )}
+                <div className="flex justify-between items-end">
+                  <div className="flex flex-col">
+                    <p className="text-xs text-gray-500 font-medium">Valor Total</p>
+                    <p className="text-lg font-bold text-primary">{quote.value}</p>
+                  </div>
+                  <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium ${quote.statusColor}`}>
+                    {quote.status}
+                  </span>
                 </div>
               </div>
 
-              <div className="mt-4 flex justify-between items-end">
-                <div className="flex flex-col">
-                  <p className="text-xs text-gray-500 font-medium">Valor Total</p>
-                  <p className="text-lg font-bold text-primary">{quote.value}</p>
-                </div>
-                <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium ${quote.statusColor}`}>
-                  {quote.status}
-                </span>
+              {/* Menu Area (Isolated from main click) */}
+              <div className="absolute top-2 right-2 z-20">
+                <button
+                  onClick={(e) => toggleMenu(e, quote.id)}
+                  className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors text-gray-400"
+                >
+                  <span className="material-symbols-outlined text-[20px]">more_vert</span>
+                </button>
+
+                {/* Dropdown Menu */}
+                {activeMenuQuoteId === quote.id && (
+                  <div
+                    className="absolute top-10 right-0 bg-white rounded-xl shadow-xl py-2 w-48 z-30 border border-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateStatus(quote.id, 'approved');
+                        setActiveMenuQuoteId(null);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-emerald-50 text-gray-700 hover:text-emerald-700 flex items-center gap-3 transition-colors font-medium text-sm"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">check_circle</span>
+                      Aprovar
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onScheduleQuote) onScheduleQuote(quote.id);
+                        setActiveMenuQuoteId(null);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-purple-50 text-gray-700 hover:text-purple-700 flex items-center gap-3 transition-colors font-medium text-sm"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">event</span>
+                      Agendar
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onEditQuote) onEditQuote(quote.id);
+                        setActiveMenuQuoteId(null);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-blue-50 text-gray-700 hover:text-blue-700 flex items-center gap-3 transition-colors font-medium text-sm"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">edit</span>
+                      Editar
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleUpdateStatus(quote.id, 'cancelled');
+                        setActiveMenuQuoteId(null);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-gray-100 text-gray-700 hover:text-gray-900 flex items-center gap-3 transition-colors font-medium text-sm"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">cancel</span>
+                      Cancelar
+                    </button>
+                    <div className="my-1 border-t border-gray-100"></div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(quote.id);
+                        setActiveMenuQuoteId(null);
+                      }}
+                      className="w-full px-4 py-3 text-left hover:bg-red-50 text-red-600 flex items-center gap-3 transition-colors font-medium text-sm"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                      Excluir
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))
