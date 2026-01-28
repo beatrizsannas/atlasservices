@@ -4,6 +4,7 @@ import { supabase } from '../supabaseClient';
 interface InventoryProps {
   onBack: () => void;
   onNewPart?: () => void;
+  onEditPart?: (id: string) => void;
 }
 
 interface Part {
@@ -14,9 +15,10 @@ interface Part {
   min_stock: number;
   cost_price: number;
   sale_price: number;
+  image_url?: string | null;
 }
 
-export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart }) => {
+export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart, onEditPart }) => {
   const [parts, setParts] = useState<Part[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,6 +62,18 @@ export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart }) => {
 
     return matchesSearch && matchesFilter;
   });
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir esta peça?')) return;
+    try {
+      const { error } = await supabase.from('inventory_parts').delete().eq('id', id);
+      if (error) throw error;
+      fetchParts();
+    } catch (error) {
+      console.error('Error deleting part:', error);
+      alert('Erro ao excluir peça.');
+    }
+  };
 
   return (
     <div className="flex flex-col min-h-screen pb-32 bg-background-light">
@@ -117,6 +131,7 @@ export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart }) => {
               return (
                 <InventoryCard
                   key={part.id}
+                  id={part.id}
                   icon="inventory_2"
                   name={part.name}
                   category={part.category || 'Geral'}
@@ -125,6 +140,9 @@ export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart }) => {
                   statusColor={status.color}
                   dotColor={status.dot}
                   qtyBg={status.bg}
+                  imageUrl={part.image_url}
+                  onEdit={() => onEditPart?.(part.id)}
+                  onDelete={() => handleDelete(part.id)}
                 />
               );
             })
@@ -148,6 +166,7 @@ const FilterButton: React.FC<{ label: string; active?: boolean; onClick: () => v
 );
 
 interface InventoryCardProps {
+  id: string;
   icon: string;
   name: string;
   category: string;
@@ -156,29 +175,71 @@ interface InventoryCardProps {
   statusColor: string;
   dotColor: string;
   qtyBg: string;
+  imageUrl?: string | null;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 const InventoryCard: React.FC<InventoryCardProps> = ({
-  icon, name, category, quantity, status, statusColor, dotColor, qtyBg
-}) => (
-  <div className="bg-white p-4 rounded-2xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-center justify-between hover:border-primary/5 transition-all cursor-pointer">
-    <div className="flex items-start gap-3">
-      <div className="h-10 w-10 rounded-lg bg-gray-50 flex items-center justify-center shrink-0">
-        <span className="material-symbols-outlined text-gray-400" style={{ fontSize: '20px' }}>{icon}</span>
+  id, icon, name, category, quantity, status, statusColor, dotColor, qtyBg, imageUrl, onEdit, onDelete
+}) => {
+  const [showMenu, setShowMenu] = useState(false);
+
+  return (
+    <div className="bg-white p-4 rounded-lg shadow-[0_2px_8px_rgba(0,0,0,0.04)] flex items-center justify-between hover:border-primary/5 transition-all relative group">
+      <div className="flex items-start gap-4 flex-1">
+        <div
+          className="h-16 w-16 rounded-lg bg-gray-50 flex items-center justify-center shrink-0 bg-cover bg-center border border-gray-100"
+          style={imageUrl ? { backgroundImage: `url("${imageUrl}")` } : {}}
+        >
+          {!imageUrl && <span className="material-symbols-outlined text-gray-400" style={{ fontSize: '24px' }}>{icon}</span>}
+        </div>
+        <div className="flex-1">
+          <h3 className="text-sm font-bold text-[#111418] leading-tight mb-1">{name}</h3>
+          <p className="text-xs text-gray-500 mb-2">{category}</p>
+
+          <div className="flex items-center gap-2">
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-sm ${qtyBg}`}>
+              Qtd: {quantity}
+            </span>
+            <div className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded-sm border border-gray-100">
+              <div className={`w-1.5 h-1.5 rounded-full ${dotColor}`}></div>
+              <span className={`text-[10px] font-medium ${statusColor}`}>{status}</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <div>
-        <h3 className="text-sm font-bold text-[#111418] leading-tight">{name}</h3>
-        <p className="text-xs text-gray-500 mt-1">{category}</p>
+
+      <div className="relative">
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+          className="p-1 rounded-full hover:bg-gray-100 text-gray-400"
+        >
+          <span className="material-symbols-outlined text-[20px]">more_vert</span>
+        </button>
+
+        {showMenu && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)}></div>
+            <div className="absolute right-0 top-full mt-1 bg-white rounded-lg shadow-xl border border-gray-100 py-1 z-20 w-32 animate-in fade-in zoom-in-95 duration-100">
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMenu(false); onEdit?.(); }}
+                className="w-full text-left px-4 py-2 text-sm text-[#111418] hover:bg-gray-50 flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">edit</span>
+                Editar
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete?.(); }}
+                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                Excluir
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
-    <div className="flex flex-col items-end gap-2">
-      <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${qtyBg}`}>
-        Qtd: {quantity}
-      </span>
-      <div className="flex items-center gap-1">
-        <span className={`text-[10px] font-medium ${statusColor}`}>{status}</span>
-        <div className={`w-2.5 h-2.5 rounded-full ${dotColor}`}></div>
-      </div>
-    </div>
-  </div>
-);
+  )
+};

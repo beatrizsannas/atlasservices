@@ -64,15 +64,15 @@ export const NewService: React.FC<NewServiceProps> = ({ onBack, onSave }) => {
         <div className="flex flex-col min-h-screen bg-background-light font-display text-[#111418] overflow-hidden">
             <div className="relative flex flex-col h-screen w-full max-w-md mx-auto bg-background-light shadow-2xl overflow-hidden">
                 {/* Header */}
-                <header className="sticky top-0 z-50 bg-[#0B2A5B] px-4 pt-safe pb-4 shadow-md transition-colors duration-200">
+                <header className="sticky top-0 z-50 bg-[#0B2A5B] p-4 pt-5 pb-4 shadow-md transition-colors duration-200">
                     <div className="flex items-center justify-between">
                         <button
                             onClick={onBack}
-                            className="flex size-10 items-center justify-center cursor-pointer hover:bg-white/10 rounded-full transition-colors -ml-2 text-white"
+                            className="flex size-12 items-center justify-start cursor-pointer hover:bg-white/10 rounded-full transition-colors text-white"
                         >
                             <span className="material-symbols-outlined text-[24px]">arrow_back</span>
                         </button>
-                        <h1 className="text-xl font-bold text-white leading-tight flex-1 text-center pr-8">
+                        <h1 className="text-xl font-bold text-white leading-tight flex-1 text-center pr-12">
                             Novo Serviço
                         </h1>
                     </div>

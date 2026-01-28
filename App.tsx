@@ -65,6 +65,7 @@ const App: React.FC = () => {
 
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
+  const [currentPartId, setCurrentPartId] = useState<string | null>(null);
 
   const isAuthScreen = currentScreen === 'login' || currentScreen === 'signup' || currentScreen === 'forgot-password' || currentScreen === 'email-sent-success' || currentScreen === 'email-sent-error' || currentScreen === 'new-password' || currentScreen === 'welcome' || currentScreen === 'signup-success' || currentScreen === 'reschedule';
 
@@ -133,6 +134,16 @@ const App: React.FC = () => {
   const handleViewAppointment = (appointmentId: string) => {
     setCurrentAppointmentId(appointmentId);
     handleNavigate('appointment-details');
+  };
+
+  const handleEditPart = (partId: string) => {
+    setCurrentPartId(partId);
+    handleNavigate('new-part');
+  };
+
+  const handleNewPart = () => {
+    setCurrentPartId(null);
+    handleNavigate('new-part');
   };
 
   return (
@@ -253,14 +264,19 @@ const App: React.FC = () => {
       {currentScreen === 'inventory' && (
         <Inventory
           onBack={() => handleNavigate('dashboard')}
-          onNewPart={() => handleNavigate('new-part')}
+          onNewPart={handleNewPart}
+          onEditPart={handleEditPart}
         />
       )}
 
       {currentScreen === 'new-part' && (
         <NewPart
-          onBack={() => handleNavigate('inventory')}
+          onBack={() => {
+            setCurrentPartId(null);
+            handleNavigate('inventory');
+          }}
           onNavigate={handleNavigate}
+          partId={currentPartId}
         />
       )}
 

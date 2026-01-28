@@ -8,7 +8,13 @@ interface NewPartProps {
   onNavigate: (screen: Screen) => void;
 }
 
-export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
+interface NewPartProps {
+  onBack: () => void;
+  onNavigate: (screen: Screen) => void;
+  partId?: string | null;
+}
+
+export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate, partId }) => {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -21,6 +27,41 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
   });
   const [uploadingImage, setUploadingImage] = useState(false);
   const { showAlert } = useAlert();
+
+  React.useEffect(() => {
+    if (partId) {
+      fetchPartData();
+    }
+  }, [partId]);
+
+  const fetchPartData = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('inventory_parts')
+        .select('*')
+        .eq('id', partId)
+        .single();
+
+      if (error) throw error;
+      if (data) {
+        setFormData({
+          name: data.name,
+          category: data.category,
+          quantity: data.quantity.toString(),
+          minStock: data.min_stock.toString(),
+          costPrice: data.cost_price.toString(),
+          salePrice: data.sale_price.toString(),
+          imageUrl: data.image_url || ''
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching part:', error);
+      showAlert('Erro', 'Erro ao carregar dados da peça.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { id, value } = e.target;
@@ -78,8 +119,7 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error('Usuário não autenticado');
 
-      const { error } = await supabase.from('inventory_parts').insert({
-        user_id: user.id,
+      const partData = {
         name: formData.name,
         category: formData.category,
         quantity: parseInt(formData.quantity) || 0,
@@ -87,9 +127,26 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
         cost_price: parseFloat(formData.costPrice) || 0,
         sale_price: parseFloat(formData.salePrice) || 0,
         image_url: formData.imageUrl || null
-      });
+      };
 
-      if (error) throw error;
+      if (partId) {
+        // Update
+        const { error } = await supabase
+          .from('inventory_parts')
+          .update(partData)
+          .eq('id', partId);
+        if (error) throw error;
+        showAlert('Sucesso', 'Peça atualizada com sucesso!', 'success');
+      } else {
+        // Insert
+        const { error } = await supabase.from('inventory_parts').insert({
+          user_id: user.id,
+          ...partData
+        });
+        if (error) throw error;
+        showAlert('Sucesso', 'Peça cadastrada com sucesso!', 'success');
+      }
+
       onBack();
     } catch (error: any) {
       console.error('Error saving part:', error);
@@ -109,7 +166,7 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
           >
             <span className="material-symbols-outlined">arrow_back</span>
           </button>
-          <h1 className="text-lg font-bold tracking-tight">Cadastrar Peça</h1>
+          <h1 className="text-lg font-bold tracking-tight">{partId ? 'Editar Peça' : 'Cadastrar Peça'}</h1>
           <div className="w-10"></div>
         </div>
       </header>
@@ -266,6 +323,6 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate }) => {
           </div>
         </div>
       </main>
-    </div>
+    </div >
   );
 };

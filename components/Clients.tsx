@@ -22,17 +22,41 @@ export const Clients: React.FC<ClientsProps> = ({ onClientClick, onBack, onNewCl
   const fetchClients = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data: clientsData, error } = await supabase
         .from('clients')
         .select('*')
         .order('name');
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      if (data) {
-        setClients(data);
+      if (clientsData) {
+        // Fetch completed service counts for these clients
+        const clientIds = clientsData.map(c => c.id);
+
+        let counts: Record<string, number> = {};
+
+        if (clientIds.length > 0) {
+          const { data: appointmentsData } = await supabase
+            .from('appointments')
+            .select('client_id')
+            .eq('status', 'completed')
+            .in('client_id', clientIds);
+
+          if (appointmentsData) {
+            appointmentsData.forEach((app: any) => {
+              if (app.client_id) {
+                counts[app.client_id] = (counts[app.client_id] || 0) + 1;
+              }
+            });
+          }
+        }
+
+        const clientsWithCounts = clientsData.map(client => ({
+          ...client,
+          serviceCount: counts[client.id] || 0
+        }));
+
+        setClients(clientsWithCounts);
       }
     } catch (error: any) {
       console.error('Error fetching clients:', error);
@@ -138,7 +162,7 @@ export const Clients: React.FC<ClientsProps> = ({ onClientClick, onBack, onNewCl
               </div>
               <div className="flex flex-col items-end gap-2">
                 <span className="bg-sky-blue/20 text-primary text-xs font-medium px-3 py-1.5 rounded-full whitespace-nowrap">
-                  Serviços: -
+                  Serviços: {client.serviceCount}
                 </span>
                 <div className="flex items-center gap-3 pr-1">
                   <button

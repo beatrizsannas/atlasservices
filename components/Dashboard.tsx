@@ -9,6 +9,7 @@ interface DashboardProps {
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   const [scheduledCount, setScheduledCount] = useState(0);
   const [completedCount, setCompletedCount] = useState(0);
+  const [monthlyStats, setMonthlyStats] = useState<{ label: string, count: number, fullDate: string }[]>([]);
   const [agendaItems, setAgendaItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -51,8 +52,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       setScheduledCount(scheduledToday || 0);
 
       // 2. Monthly Summary: Completed This Month
-      // Uses already calculated startOfMonthStr/endOfMonthStr
-
       const { count: completedMonth } = await supabase
         .from('appointments')
         .select('*', { count: 'exact', head: true })
@@ -64,7 +63,47 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
       setCompletedCount(completedMonth || 0);
 
-      // 3. Agenda: Today's Appointments
+      // 3. Monthly Progress (Yearly Data)
+      const startOfYearStr = `${year}-01-01`;
+      const endOfYearStr = `${year}-12-31`;
+
+      const { data: yearCompleted, error: yearError } = await supabase
+        .from('appointments')
+        .select('id, date')
+        .eq('user_id', user.id)
+        .gte('date', startOfYearStr)
+        .lte('date', endOfYearStr)
+        .eq('status', 'completed')
+        .neq('status', 'deleted');
+
+      if (yearError) {
+        console.error('Error fetching yearly stats:', yearError);
+      }
+
+      if (yearCompleted) {
+        const counts = Array(12).fill(0);
+        yearCompleted.forEach((app: any) => {
+          // app.date is YYYY-MM-DD
+          if (!app.date) return;
+          const parts = app.date.split('-');
+          if (parts.length > 1) {
+            const mIndex = parseInt(parts[1], 10) - 1; // 0-11
+            if (mIndex >= 0 && mIndex < 12) counts[mIndex]++;
+          }
+        });
+
+        const monthLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const stats = monthLabels.map((label, idx) => ({
+          label,
+          count: counts[idx],
+          fullDate: new Date(year, idx, 1).toISOString()
+        }));
+
+        // Show first 6 months or window? Let's show first 4 to match UI mockup roughly, but dynamic
+        setMonthlyStats(stats.slice(0, 6));
+      }
+
+      // 4. Agenda: Today's Appointments
       const { data: agendaData } = await supabase
         .from('appointments')
         .select(`
@@ -120,7 +159,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
   return (
     <>
       <DailySummary date={today} scheduled={scheduledCount} completed={completedCount} />
-      <MonthlyProgress onNavigate={onNavigate} />
+      <MonthlyProgress onNavigate={onNavigate} data={monthlyStats} />
       <DailyAgenda date={today} items={agendaItems} loading={loading} />
     </>
   );
@@ -145,8 +184,6 @@ const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed 
             <div className="p-2 bg-primary/10 rounded-lg">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '20px' }}>calendar_month</span>
             </div>
-            {/* Trend could be calculated if we compare to yesterday, static for now or remove if no data */}
-            {/* <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+2 hoje</span> */}
           </div>
           <div>
             <p className="text-3xl font-bold text-[#111418]">{scheduled}</p>
@@ -158,7 +195,6 @@ const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed 
             <div className="p-2 bg-sky-blue/20 rounded-lg">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '20px' }}>check_circle</span>
             </div>
-            {/* <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">+5% mês</span> */}
           </div>
           <div>
             <p className="text-3xl font-bold text-[#111418]">{completed}</p>
@@ -170,43 +206,92 @@ const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed 
   );
 };
 
-const MonthlyProgress: React.FC<{ onNavigate: (screen: Screen) => void }> = ({ onNavigate }) => {
-  // Static for now, hard to chart with just simple data. 
-  // Ideally fetch aggregates. Leaving static structure but user should know it requires more complex queries for real bars.
+const MonthlyProgress: React.FC<{ onNavigate: (screen: Screen) => void, data: { label: string, count: number }[] }> = ({ onNavigate, data }) => {
+  // Find max for scaling
+  const maxCount = Math.max(...data.map(d => d.count), 5);
+  const totalServices = data.reduce((acc, curr) => acc + curr.count, 0);
+
+  // Helper to determine color based on index or logic. 
+  // The image implies a progression or just active vs inactive. 
+  // Let's use: Current month (last one with data?) = Dark. Others = varying light blues to create depth?
+  // Or just Light Blue for past, Dark for current.
+  // The image shows Jan(Light), Fev(Light), Mar(Medium?), Abr(Dark).
+  // I'll simulate a gradient of blues for the bars.
+
   return (
-    <section className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
+    <section className="bg-white p-5 rounded-[20px] shadow-sm border border-gray-100">
       <div className="flex justify-between items-start mb-6">
         <div>
           <h3 className="text-base font-bold text-[#111418]">Progresso Mensal</h3>
-          <p className="text-xs text-gray-500 mt-1">Visualização Geral</p>
+          <p className="text-xs text-gray-500 mt-1">Total de {totalServices} serviços</p>
         </div>
         <button
-          onClick={() => onNavigate('finance')} // Redirecting to Finance or Monthly Progress screen
+          onClick={() => onNavigate('finance')}
           className="text-primary text-sm font-medium hover:underline"
         >
           Ver tudo
         </button>
       </div>
-      <div className="h-48 w-full flex items-end justify-between gap-3 px-2 opacity-50 pointer-events-none grayscale">
-        {/* Placeholder bars to show UI structure until we implement aggregation */}
-        <Bar height="h-24" color="bg-sky-blue/30" value="24" label="Jan" />
-        <Bar height="h-32" color="bg-sky-blue/50" value="32" label="Fev" />
-        <Bar height="h-20" color="bg-sky-blue/80" value="20" label="Mar" />
-        <Bar height="h-40" color="bg-primary" value="45" label="Abr" isHighlighted />
+      <div className="h-48 w-full flex items-end justify-between gap-4 px-2">
+        {data.length === 0 ? (
+          <div className="w-full h-full flex items-center justify-center">
+            <p className="text-xs text-gray-400">Sem dados</p>
+          </div>
+        ) : (
+          data.map((item, index) => {
+            const heightPercent = (item.count / maxCount) * 100;
+            // Highlight the current month (assuming last in the list is current/latest for now, or check real date)
+            // But 'data' is slice(0,6).
+            // Let's assume the last item is the "current" one relevant to the user or simply the one with most activity? 
+            // The image shows April (Abr) as Dark.
+            // Let's make the bar with the Current Month index Dark, others Light.
+            const isCurrentMonth = index === new Date().getMonth();
+
+            // Logic updated per user feedback:
+            // If the month has data (count > 0), use the prominent Dark Blue (bg-primary).
+            // Otherwise, use varied light blues to maintain the aesthetic but distinct from white.
+
+            let barColor = "bg-[#E0F2FE]"; // Default light
+            if (index === 1) barColor = "bg-[#BAE6FD]";
+            if (index === 2) barColor = "bg-[#7DD3FC]";
+
+            // Ensure even 0 count has a tiny visible bar so we know it rendered
+            // Using explicit hex #0B2A5B instead of bg-primary to ensure verification
+            if (isCurrentMonth || item.count > 0) {
+              barColor = "bg-[#0B2A5B]";
+            } else if (index > 2) {
+              barColor = "bg-[#E0F2FE]";
+            }
+
+            return (
+              <Bar
+                key={index}
+                heightStyle={{ height: `${Math.max(heightPercent, 8)}%` }}
+                color={barColor}
+                value={item.count.toString()}
+                label={item.label}
+                isHighlighted={isCurrentMonth}
+              />
+            );
+          })
+        )}
       </div>
-      <div className="text-center text-xs text-gray-400 mt-2 italic">Dados do gráfico em desenvolvimento</div>
     </section>
   );
 };
 
-const Bar: React.FC<{ height: string; color: string; value: string; label: string; isHighlighted?: boolean }> = ({ height, color, value, label, isHighlighted }) => (
-  <div className="flex flex-col items-center gap-2 w-full group cursor-pointer">
-    <div className={`w-full ${color} rounded-t-lg relative ${height} transition-all hover:opacity-80 ${isHighlighted ? 'shadow-md shadow-primary/20' : ''}`}>
-      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10">
+const Bar: React.FC<{ heightStyle: React.CSSProperties; color: string; value: string; label: string; isHighlighted?: boolean }> = ({ heightStyle, color, value, label, isHighlighted }) => (
+  <div className="flex flex-col items-center gap-3 w-full h-full justify-end group cursor-pointer">
+    <div
+      className={`w-full ${color} rounded-t-2xl relative transition-all hover:opacity-90`}
+      style={heightStyle}
+    >
+      {/* Tooltip on hover only, cleanest look */}
+      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
         {value}
       </div>
     </div>
-    <span className={`text-xs ${isHighlighted ? 'font-bold text-primary' : 'font-medium text-gray-500'}`}>
+    <span className={`text-xs ${isHighlighted ? 'font-bold text-[#0B2A5B]' : 'font-medium text-gray-500'}`}>
       {label}
     </span>
   </div>

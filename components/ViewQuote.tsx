@@ -76,7 +76,34 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
         .eq('quote_id', quoteId);
 
       if (itemsError) throw itemsError;
-      setItems(itemsData || []);
+      if (itemsError) throw itemsError;
+
+      // Fetch images for parts
+      let itemsWithImages = itemsData || [];
+      const partIds = itemsData
+        ?.filter((item: any) => item.item_type === 'part' && item.related_id)
+        .map((item: any) => item.related_id) || [];
+
+      if (partIds.length > 0) {
+        const { data: partsImages } = await supabase
+          .from('inventory_parts')
+          .select('id, image_url')
+          .in('id', partIds);
+
+        if (partsImages) {
+          const imageMap = partsImages.reduce((acc: any, part: any) => {
+            acc[part.id] = part.image_url;
+            return acc;
+          }, {});
+
+          itemsWithImages = itemsData.map((item: any) => ({
+            ...item,
+            image_url: item.related_id ? imageMap[item.related_id] : null
+          }));
+        }
+      }
+
+      setItems(itemsWithImages);
 
     } catch (error) {
       console.error('Error fetching quote details:', error);
@@ -199,17 +226,22 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
                 <tbody className="divide-y divide-gray-100">
                   {items.map((item) => (
                     <tr key={item.id}>
-                      <td className="py-4 align-top">
-                        <div className="flex items-start gap-3">
+                      <td className="py-3">
+                        <div className="flex items-center gap-3">
+                          {item.image_url && (
+                            <img
+                              src={item.image_url}
+                              alt={item.description}
+                              className="w-10 h-10 rounded-lg bg-gray-100 flex-shrink-0 object-cover border border-gray-100"
+                            />
+                          )}
                           <div>
-                            <p className="font-semibold text-gray-900 leading-snug">{item.description}</p>
-                            <p className="text-xs text-gray-500 mt-1">{item.quantity} x R$ {formatCurrency(item.unit_price)}</p>
+                            <p className="font-medium text-gray-900">{item.description}</p>
+                            <p className="text-gray-500 text-xs mt-0.5">{item.quantity} x R$ {formatCurrency(item.unit_price)}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="py-4 pr-1 text-right align-top font-medium text-gray-700">
-                        R$ {formatCurrency(item.quantity * item.unit_price)}
-                      </td>
+                      <td className="text-right py-3 font-medium text-gray-900 align-top pt-4">R$ {formatCurrency(item.quantity * item.unit_price)}</td>
                     </tr>
                   ))}
                 </tbody>

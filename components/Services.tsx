@@ -140,10 +140,10 @@ interface ServiceCardProps {
 }
 
 const ServiceCard: React.FC<ServiceCardProps> = ({ title, duration, price, onEdit, onDelete }) => (
-  <div className="flex items-center gap-4 bg-white px-4 py-3 rounded-lg shadow-sm border border-gray-100">
+  <div className="flex items-start gap-4 bg-white px-4 py-3 rounded-lg shadow-sm border border-gray-100">
     <div className="flex items-center gap-4 flex-1">
       <div className="flex flex-col justify-center">
-        <p className="text-[#111418] text-base font-semibold leading-normal line-clamp-1">{title}</p>
+        <p className="text-[#111418] text-base font-semibold leading-normal">{title}</p>
         <div className="flex items-center gap-1 mt-0.5">
           <span className="material-symbols-outlined text-[#637188] text-[16px]">schedule</span>
           <p className="text-[#637188] text-xs font-medium leading-normal">{duration}</p>

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { FinanceReports } from './FinanceReports';
 
 interface FinanceProps {
   onBack: () => void;
@@ -20,6 +21,7 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
   const [activeFilter, setActiveFilter] = useState('Todos');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentScreen, setCurrentScreen] = useState<'dashboard' | 'reports'>('dashboard');
 
   useEffect(() => {
     fetchTransactions();
@@ -68,6 +70,10 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
   };
 
   const { income, expense, total } = calculateTotals();
+
+  if (currentScreen === 'reports') {
+    return <FinanceReports onBack={() => setCurrentScreen('dashboard')} />;
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background-light font-display text-[#111418] pb-32">
@@ -133,7 +139,10 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
         <section>
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold text-[#111418]">Fluxo de Caixa</h3>
-            <button className="text-primary text-sm font-medium flex items-center gap-1 hover:opacity-80 transition-opacity">
+            <button
+              onClick={() => setCurrentScreen('reports')}
+              className="text-primary text-sm font-medium flex items-center gap-1 hover:opacity-80 transition-opacity"
+            >
               <span className="material-symbols-outlined text-lg">bar_chart</span>
               Ver Relatórios
             </button>

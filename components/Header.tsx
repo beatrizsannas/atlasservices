@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
 
         <div
           onClick={onProfileClick}
-          className="h-10 w-10 rounded-full bg-cover bg-center border-2 border-white shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-gray-200 flex items-center justify-center text-[#111418] font-bold text-sm"
+          className="h-10 w-10 rounded-full bg-cover bg-center border-2 border-white shadow-sm cursor-pointer hover:opacity-80 transition-opacity bg-white flex items-center justify-center text-[#111418] font-bold text-sm"
           style={avatarUrl ? { backgroundImage: `url("${avatarUrl}")` } : {}}
         >
           {!avatarUrl && getInitials(userName)}
@@ -77,10 +77,7 @@ export const Header: React.FC<HeaderProps> = ({ onProfileClick }) => {
       </div>
 
       <div className="flex items-center gap-2">
-        <button className="h-10 w-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 transition-colors relative">
-          <span className="material-symbols-outlined" style={{ fontSize: '24px' }}>notifications</span>
-          <span className="absolute top-2 right-2 h-2 w-2 bg-red-500 rounded-full border-2 border-white"></span>
-        </button>
+        {/* Notifications removed as requested */}
       </div>
     </div>
   );

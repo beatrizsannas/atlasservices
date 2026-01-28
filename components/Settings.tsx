@@ -60,7 +60,7 @@ export const Settings: React.FC<SettingsProps> = ({ onBack, onNavigate }) => {
           <div className="flex px-5 py-6 flex-col items-center bg-white shadow-sm rounded-xl border border-gray-100">
             <div className="relative mb-3 group cursor-pointer" onClick={() => onNavigate('user-profile')}>
               <div
-                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-20 w-20 ring-4 ring-primary/10 bg-gray-200"
+                className="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-20 w-20 ring-4 ring-primary/10 bg-white"
                 style={{ backgroundImage: profile.avatar_url ? `url("${profile.avatar_url}")` : undefined }}
               >
               </div>

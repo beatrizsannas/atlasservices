@@ -52,7 +52,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
       const { data: servicesData } = await supabase.from('services').select('id, title, price, description');
       if (servicesData) setServicesList(servicesData);
 
-      const { data: partsData } = await supabase.from('inventory_parts').select('id, name, sale_price, category');
+      const { data: partsData } = await supabase.from('inventory_parts').select('id, name, sale_price, category, image_url');
       if (partsData) setPartsList(partsData);
 
       setFetchingDeps(false);
@@ -129,7 +129,8 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
       type: modalTab === 'custom' ? 'Personalizado' : (modalTab === 'service' ? 'Serviço' : 'Peça'),
       origin: type,
       quantity: 1,
-      price: modalTab === 'custom' ? parseFloat(item.price) : (modalTab === 'service' ? item.price : item.sale_price)
+      price: modalTab === 'custom' ? parseFloat(item.price) : (modalTab === 'service' ? item.price : item.sale_price),
+      imageUrl: item.image_url || null
     };
     setItems(prev => [...prev, newItem]);
     setIsModalOpen(false);
@@ -259,7 +260,8 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
         item_type: item.origin, // service, part, custom
         description: item.name,
         quantity: item.quantity,
-        unit_price: item.price
+        unit_price: item.price,
+        related_id: item.original_id || null
       }));
 
       const { error: itemsError } = await supabase.from('quote_items').insert(quoteItems);
@@ -334,9 +336,19 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
           {items.map((item) => (
             <div key={item.id} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 relative group">
               <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h3 className="font-semibold text-gray-900">{item.name}</h3>
-                  <p className="text-xs text-gray-500">{item.type}</p>
+                <div className="flex items-start gap-3">
+                  {item.origin === 'part' && (
+                    <div
+                      className="w-12 h-12 rounded-lg bg-gray-100 flex-shrink-0 bg-cover bg-center border border-gray-200 flex items-center justify-center"
+                      style={item.imageUrl ? { backgroundImage: `url("${item.imageUrl}")` } : {}}
+                    >
+                      {!item.imageUrl && <span className="material-symbols-outlined text-gray-400 text-[24px]">inventory_2</span>}
+                    </div>
+                  )}
+                  <div>
+                    <h3 className="font-semibold text-gray-900 leading-tight">{item.name}</h3>
+                    <p className="text-xs text-gray-500 mt-1">{item.type}</p>
+                  </div>
                 </div>
                 <button
                   onClick={() => removeItem(item.id)}
@@ -345,7 +357,7 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
                   <span className="material-symbols-outlined text-[20px]">delete</span>
                 </button>
               </div>
-              <div className="flex items-center justify-between gap-4 mt-3">
+              <div className="flex items-center justify-between gap-4 mt-3 pl-[60px]">
                 <div className="flex items-center border border-gray-200 rounded-lg bg-gray-50">
                   <button
                     onClick={() => handleQuantityChange(item.id, -1)}
@@ -475,9 +487,17 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
                 ))}
                 {modalTab === 'part' && searchResults.map(item => (
                   <button key={item.id} onClick={() => addItem(item, 'part')} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl border border-transparent hover:border-gray-100 text-left group transition-all">
-                    <div>
-                      <div className="font-bold text-[#111418]">{item.name}</div>
-                      <div className="text-xs text-gray-500">{item.category}</div>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-lg bg-gray-100 flex-shrink-0 bg-cover bg-center border border-gray-200 flex items-center justify-center"
+                        style={item.image_url ? { backgroundImage: `url("${item.image_url}")` } : {}}
+                      >
+                        {!item.image_url && <span className="material-symbols-outlined text-gray-400 text-[20px]">inventory_2</span>}
+                      </div>
+                      <div>
+                        <div className="font-bold text-[#111418]">{item.name}</div>
+                        <div className="text-xs text-gray-500">{item.category}</div>
+                      </div>
                     </div>
                     <div className="text-[#0B2A5B] font-bold">
                       + R$ {item.sale_price ? item.sale_price.toFixed(2) : '0.00'}

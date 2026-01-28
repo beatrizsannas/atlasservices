@@ -14,6 +14,7 @@ interface Part {
   min_stock: number;
   cost_price: number;
   sale_price: number;
+  image_url?: string | null;
 }
 
 export const QuoteSelectEquipment: React.FC<QuoteSelectEquipmentProps> = ({ onBack }) => {
@@ -127,6 +128,7 @@ export const QuoteSelectEquipment: React.FC<QuoteSelectEquipmentProps> = ({ onBa
                   onAdd={() => !isOutOfStock && handleAddItem(part.id)}
                   onRemove={() => handleRemoveItem(part.id)}
                   disabled={isOutOfStock}
+                  imageUrl={part.image_url}
                 />
               );
             })
@@ -158,12 +160,16 @@ interface EquipmentItemProps {
   onAdd: () => void;
   onRemove: () => void;
   disabled?: boolean;
+  imageUrl?: string | null;
 }
 
-const EquipmentItem: React.FC<EquipmentItemProps> = ({ title, category, price, stock, stockColor, qtySelected, onAdd, onRemove, disabled }) => (
+const EquipmentItem: React.FC<EquipmentItemProps> = ({ title, category, price, stock, stockColor, qtySelected, onAdd, onRemove, disabled, imageUrl }) => (
   <div className={`bg-white dark:bg-gray-800 p-4 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 flex gap-4 ${qtySelected > 0 ? 'border-l-4 border-l-primary dark:border-l-sky-blue' : ''} ${disabled ? 'opacity-75' : ''}`}>
-    <div className="w-20 h-20 rounded-lg bg-gray-100 dark:bg-gray-700 flex-shrink-0 overflow-hidden flex items-center justify-center">
-      <span className="material-symbols-outlined text-gray-400 text-3xl">inventory_2</span>
+    <div
+      className="w-20 h-20 rounded-lg bg-gray-100 dark:bg-gray-700 flex-shrink-0 overflow-hidden flex items-center justify-center bg-cover bg-center"
+      style={imageUrl ? { backgroundImage: `url("${imageUrl}")` } : {}}
+    >
+      {!imageUrl && <span className="material-symbols-outlined text-gray-400 text-3xl">inventory_2</span>}
     </div>
     <div className="flex-1 flex flex-col justify-between">
       <div>
