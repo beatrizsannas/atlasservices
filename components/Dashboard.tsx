@@ -23,12 +23,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       if (!user) return;
 
       const now = new Date();
-      const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString();
+      // Use local date strings YYYY-MM-DD
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
 
-      const todayStr = new Date().toISOString().split('T')[0];
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const sm = String(startOfMonth.getMonth() + 1).padStart(2, '0');
+      const sd = String(startOfMonth.getDate()).padStart(2, '0');
+      const startOfMonthStr = `${startOfMonth.getFullYear()}-${sm}-${sd}`;
+
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const em = String(endOfMonth.getMonth() + 1).padStart(2, '0');
+      const ed = String(endOfMonth.getDate()).padStart(2, '0');
+      const endOfMonthStr = `${endOfMonth.getFullYear()}-${em}-${ed}`;
 
       // 1. Daily Summary: Scheduled Today
       const { count: scheduledToday } = await supabase
@@ -36,13 +45,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id)
         .eq('date', todayStr)
-        .eq('status', 'scheduled');
+        .eq('status', 'scheduled')
+        .neq('status', 'deleted');
 
       setScheduledCount(scheduledToday || 0);
 
       // 2. Monthly Summary: Completed This Month
-      const startOfMonthStr = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const endOfMonthStr = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      // Uses already calculated startOfMonthStr/endOfMonthStr
 
       const { count: completedMonth } = await supabase
         .from('appointments')
@@ -50,7 +59,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         .eq('user_id', user.id)
         .gte('date', startOfMonthStr)
         .lte('date', endOfMonthStr)
-        .eq('status', 'completed');
+        .eq('status', 'completed')
+        .neq('status', 'deleted');
 
       setCompletedCount(completedMonth || 0);
 
@@ -60,26 +70,21 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         .select(`
                 id,
                 date,
+                title,
                 start_time,
                 status,
                 type,
-                related_id,
-                clients (name),
-                services (title)
+                clients (name)
             `)
         .eq('user_id', user.id)
         .eq('date', todayStr)
+        .neq('status', 'deleted')
         .order('start_time', { ascending: true })
         .limit(5);
 
       if (agendaData) {
         const items = await Promise.all(agendaData.map(async (app: any) => {
-          let serviceName = 'Serviço';
-          if (app.type === 'service' && app.services) {
-            serviceName = app.services.title;
-          } else if (app.type === 'quote') {
-            serviceName = 'Orçamento';
-          }
+          const serviceName = app.title || (app.type === 'quote' ? 'Orçamento' : 'Serviço');
 
           let statusLabel = 'Agendado';
           let statusColor = 'bg-sky-blue/10 text-primary border-sky-blue/20';

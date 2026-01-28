@@ -4,7 +4,7 @@ import { useAlert } from '../contexts/AlertContext';
 
 interface ScheduleProps {
   onNewAppointment?: () => void;
-  onAppointmentClick?: () => void;
+  onAppointmentClick?: (id: string) => void;
   onReschedule?: () => void;
   onBack: () => void;
 }
@@ -38,40 +38,57 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
         .select(`
                 id,
                 date,
+                title,
                 start_time,
                 end_time,
                 status,
                 type,
-                related_id,
+                type,
                 notes,
-                clients (name, avatar_url),
-                services (title)
+                clients (name)
             `)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .neq('status', 'deleted');
 
+      // Use local date for Today instead of UTC to avoid timezone mismatches
       const now = new Date();
-      const todayStr = now.toISOString().split('T')[0];
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const todayStr = `${year}-${month}-${day}`;
 
       if (activeTab === 'Hoje') {
         query = query.eq('date', todayStr);
       } else if (activeTab === 'Semana') {
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
-        const startStr = startOfWeek.toISOString().split('T')[0];
+        const sy = startOfWeek.getFullYear();
+        const sm = String(startOfWeek.getMonth() + 1).padStart(2, '0');
+        const sd = String(startOfWeek.getDate()).padStart(2, '0');
+        const startStr = `${sy}-${sm}-${sd}`;
 
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(startOfWeek.getDate() + 6);
-        const endStr = endOfWeek.toISOString().split('T')[0];
+        const ey = endOfWeek.getFullYear();
+        const em = String(endOfWeek.getMonth() + 1).padStart(2, '0');
+        const ed = String(endOfWeek.getDate()).padStart(2, '0');
+        const endStr = `${ey}-${em}-${ed}`;
 
         query = query
           .gte('date', startStr)
           .lte('date', endStr);
       } else if (activeTab === 'Mês') {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const startStr = startOfMonth.toISOString().split('T')[0];
+        const sy = startOfMonth.getFullYear();
+        const sm = String(startOfMonth.getMonth() + 1).padStart(2, '0');
+        const sd = String(startOfMonth.getDate()).padStart(2, '0');
+        const startStr = `${sy}-${sm}-${sd}`;
 
         const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const endStr = endOfMonth.toISOString().split('T')[0];
+        const ey = endOfMonth.getFullYear();
+        const em = String(endOfMonth.getMonth() + 1).padStart(2, '0');
+        const ed = String(endOfMonth.getDate()).padStart(2, '0');
+        const endStr = `${ey}-${em}-${ed}`;
 
         query = query
           .gte('date', startStr)
@@ -97,18 +114,11 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
         // For simplicity, let's fetch quotes ids and titles if there are any quote type appointments.
 
         const appointmentList = await Promise.all(data.map(async (app: any) => {
-          let title = 'Agendamento';
-          if (app.type === 'service' && app.services) {
-            title = app.services.title;
-          } else if (app.type === 'quote') {
-            // Fetch quote title
-            // Optimization: Bulk fetch quotes? Or just one by one for now (less complex).
-            const { data: quote } = await supabase.from('quotes').select('id').eq('id', app.related_id).single();
-            if (quote) {
-              title = `Orçamento #${quote.id.substr(0, 8)}`;
-            } else {
-              title = 'Orçamento';
-            }
+          // Use saved title, fallback if missing
+          let title = app.title || 'Agendamento';
+
+          if (!app.title && app.type === 'quote') {
+            title = 'Orçamento';
           }
 
           // Parse time
@@ -266,9 +276,11 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
                   isOpacityReduced={app.isOpacityReduced}
                   isCancelled={app.isCancelled}
                   rawStatus={app.rawStatus}
-                  onDetailsClick={onAppointmentClick}
-                  onReschedule={onReschedule}
+
+                  onDetailsClick={() => onAppointmentClick && onAppointmentClick(app.id)}
+                  onReschedule={() => onReschedule && onReschedule()}
                   onUpdateStatus={handleUpdateStatus}
+                  onDelete={(id) => handleUpdateStatus(id, 'deleted')} // Map delete to status update for now, or implement hard delete
                 />
               ))}
             </div>
@@ -387,14 +399,15 @@ interface AppointmentCardProps {
   initialsColor?: string;
   isOpacityReduced?: boolean;
   isCancelled?: boolean;
-  rawStatus: string; // Add raw status for logic
+  rawStatus: string;
   onDetailsClick?: () => void;
-  onReschedule?: () => void;
-  onUpdateStatus: (id: string, newStatus: string) => void; // Add update handler
+  onReschedule?: (id: string) => void;
+  onUpdateStatus: (id: string, newStatus: string) => void;
+  onDelete?: (id: string) => void;
 }
 
 const AppointmentCard: React.FC<AppointmentCardProps> = ({
-  id, status, statusColor, dotColor, iconStatus, time, title, personName, personImage, initials, initialsColor, isOpacityReduced, isCancelled, rawStatus, onDetailsClick, onReschedule, onUpdateStatus
+  id, status, statusColor, dotColor, iconStatus, time, title, personName, personImage, initials, initialsColor, isOpacityReduced, isCancelled, rawStatus, onDetailsClick, onReschedule, onUpdateStatus, onDelete
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
@@ -411,39 +424,59 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
           <>
             <div className="fixed inset-0 z-10" onClick={() => setIsMenuOpen(false)}></div>
             <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-xl shadow-[0_4px_20px_rgba(0,0,0,0.1)] border border-gray-100 overflow-hidden z-30 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
-              {rawStatus !== 'completed' && rawStatus !== 'cancelled' && (
-                <button
-                  className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
-                  onClick={() => {
-                    onUpdateStatus(id, 'completed');
-                    setIsMenuOpen(false);
-                  }}
-                >
-                  <span className="material-symbols-outlined text-gray-400 text-[20px]">check_circle</span>
-                  Serviço Concluído
-                </button>
+              {rawStatus === 'scheduled' && (
+                <>
+                  <button
+                    className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors"
+                    onClick={() => {
+                      onUpdateStatus(id, 'completed');
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-gray-400 text-[20px]">check_circle</span>
+                    Serviço Concluído
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMenuOpen(false);
+                      onReschedule?.(id);
+                    }}
+                    className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors border-t border-gray-50"
+                  >
+                    <span className="material-symbols-outlined text-gray-400 text-[20px]">edit_calendar</span>
+                    Remarcar
+                  </button>
+                  <button
+                    className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors border-t border-gray-50"
+                    onClick={() => {
+                      onUpdateStatus(id, 'cancelled');
+                      setIsMenuOpen(false);
+                    }}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">cancel</span>
+                    Cancelar
+                  </button>
+                </>
               )}
-              {/* Reschedule might be just another editing action, but for now just call prop */}
-              {/* <button
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onReschedule?.();
-                }}
-                className="w-full text-left px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 flex items-center gap-3 transition-colors border-t border-gray-50"
-              >
-                <span className="material-symbols-outlined text-gray-400 text-[20px]">edit_calendar</span>
-                Reagendar
-              </button> */}
-              {rawStatus !== 'cancelled' && (
+
+              {(rawStatus === 'completed' || rawStatus === 'cancelled') && (
                 <button
-                  className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors border-t border-gray-50"
+                  className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center gap-3 transition-colors"
                   onClick={() => {
-                    onUpdateStatus(id, 'cancelled');
+                    // Assuming delete means archiving or hard delete. For now, let's use a delete handler passed from parent or just hide it.
+                    // The user asked to "Apagar".
+                    if (onDelete) {
+                      onDelete(id);
+                    } else {
+                      // Fallback to update status to deleted if no handler?
+                      // Or simple alert for now if not implemented upstream
+                      onUpdateStatus(id, 'deleted');
+                    }
                     setIsMenuOpen(false);
                   }}
                 >
-                  <span className="material-symbols-outlined text-[20px]">cancel</span>
-                  Cancelar
+                  <span className="material-symbols-outlined text-[20px]">delete</span>
+                  Apagar
                 </button>
               )}
             </div>
@@ -461,10 +494,8 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             </span>
             <span className={`text-xs text-[#637188] font-medium ${isCancelled ? 'line-through' : ''}`}>{time}</span>
           </div>
-          <h3 className={`text-lg font-bold leading-tight pr-6 ${isCancelled ? 'text-[#637188] line-through decoration-gray-400' : 'text-[#111418]'}`}>
-            {title}
-          </h3>
-          <div className="flex items-center gap-3 mt-1">
+
+          <div className="flex items-center gap-3 mb-1">
             {personImage ? (
               <div
                 className="size-6 rounded-full bg-gray-200 bg-center bg-cover"
@@ -477,6 +508,10 @@ const AppointmentCard: React.FC<AppointmentCardProps> = ({
             )}
             <p className="text-[#637188] text-sm font-normal">{personName}</p>
           </div>
+
+          <h3 className={`text-lg font-bold leading-tight pr-6 ${isCancelled ? 'text-[#637188] line-through decoration-gray-400' : 'text-[#111418]'}`}>
+            {title}
+          </h3>
         </div>
       </div>
 

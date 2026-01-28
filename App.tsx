@@ -53,6 +53,7 @@ const App: React.FC = () => {
   const [quoteValidityDate, setQuoteValidityDate] = useState('2023-11-24');
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
   const [currentClientId, setCurrentClientId] = useState<string | null>(null);
+  const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
 
   // ... (existing code)
 
@@ -129,6 +130,11 @@ const App: React.FC = () => {
     handleNavigate('new-client');
   };
 
+  const handleViewAppointment = (appointmentId: string) => {
+    setCurrentAppointmentId(appointmentId);
+    handleNavigate('appointment-details');
+  };
+
   return (
     <div className="min-h-screen bg-background-light relative">
       {!isAuthScreen && (
@@ -194,7 +200,7 @@ const App: React.FC = () => {
       {currentScreen === 'schedule' && (
         <Schedule
           onNewAppointment={() => handleNavigate('new-appointment')}
-          onAppointmentClick={() => handleNavigate('appointment-details')}
+          onAppointmentClick={(id) => handleViewAppointment(id)}
           onReschedule={() => handleNavigate('reschedule')}
           onBack={() => handleNavigate('dashboard')}
         />
@@ -212,6 +218,7 @@ const App: React.FC = () => {
 
       {currentScreen === 'appointment-details' && (
         <AppointmentDetails
+          appointmentId={currentAppointmentId}
           onBack={() => handleNavigate('schedule')}
           onReschedule={() => handleNavigate('reschedule')}
         />

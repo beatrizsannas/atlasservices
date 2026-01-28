@@ -8,7 +8,7 @@ interface NewAppointmentProps {
 }
 
 export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQuoteId }) => {
-  const [appointmentType, setAppointmentType] = useState<'service' | 'quote'>('service');
+  const [appointmentType, setAppointmentType] = useState<'service' | 'quote' | 'avulso'>('service');
   const [loading, setLoading] = useState(false);
   const [clients, setClients] = useState<any[]>([]);
   const [services, setServices] = useState<any[]>([]);
@@ -178,10 +178,21 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Determine title
+      let title = 'Agendamento';
+      if (appointmentType === 'service' && selectedItem) {
+        title = selectedItem.title;
+      } else if (appointmentType === 'quote' && selectedItem) {
+        title = `Orçamento #${selectedItem.id.substr(0, 8)}`;
+      } else if (appointmentType === 'avulso') {
+        title = 'Agendamento Avulso';
+      }
+
       // 1. Insert without related_id first to bypass schema cache issue
       const { data: insertedData, error: insertError } = await supabase.from('appointments').insert({
         user_id: user.id,
         client_id: selectedClient.id,
+        title: title,
         type: appointmentType,
         date: selectedDate,
         start_time: `${startTime}:00`,
@@ -205,6 +216,7 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
         }
       }
 
+      showAlert('Sucesso', 'Agendamento confirmado!', 'success');
       onBack();
     } catch (error: any) {
       console.error('Error saving appointment:', error);
@@ -400,84 +412,102 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
                     Orçamento
                   </div>
                 </label>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2" ref={dropdownRef}>
-              <label className="text-sm font-semibold text-[#111418]">
-                {appointmentType === 'service' ? 'Serviço' : 'Orçamento'}
-              </label>
-              <div className="relative">
-                <div
-                  className="w-full bg-gray-50 text-[#111418] text-sm rounded-xl border-0 ring-1 ring-gray-200 focus:ring-2 focus:ring-primary pl-4 pr-10 py-3.5 cursor-pointer flex items-center justify-between"
-                  onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-                >
-                  <span className={!selectedItem ? "text-gray-400" : ""}>
-                    {selectedItem ? (appointmentType === 'service' ? selectedItem.title : selectedItem.title) : (appointmentType === 'service' ? 'Selecione um serviço...' : 'Selecione um orçamento...')}
-                  </span>
-                  <span className={`material-symbols-outlined text-gray-500 text-[20px] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}>
-                    expand_more
-                  </span>
-                </div>
-
-                {isDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-48 overflow-y-auto">
-                    {appointmentType === 'service' ? (
-                      services.map((service) => (
-                        <button
-                          key={service.id}
-                          className="w-full text-left px-4 py-2.5 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
-                          onClick={() => {
-                            setSelectedItem(service);
-                            setIsDropdownOpen(false);
-                          }}
-                        >
-                          {service.title} ({service.duration_minutes}m)
-                        </button>
-                      ))
-                    ) : (
-                      (() => {
-                        const filtered = quotes.filter(quote => {
-                          if (!selectedClient) return true;
-                          return String(quote.client_id) === String(selectedClient.id);
-                        });
-
-                        return filtered.length > 0 ? (
-                          filtered.map((quote) => (
-                            <button
-                              key={quote.id}
-                              className="w-full text-left px-4 py-3 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg border-b border-gray-50 last:border-0 flex justify-between items-center group"
-                              onClick={() => {
-                                setSelectedItem(quote);
-                                setIsDropdownOpen(false);
-                              }}
-                            >
-                              <div className="flex flex-col">
-                                <span className="font-medium text-gray-900 group-hover:text-[#0B2A5B] transition-colors">
-                                  Orçamento #{quote.id.substr(0, 8)}
-                                </span>
-                                <span className="text-xs text-gray-500">
-                                  {quote.total_amount ? `R$ ${quote.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
-                                </span>
-                              </div>
-                              <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${quote.statusColor || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                                {quote.statusLabel || quote.status}
-                              </span>
-                            </button>
-                          ))
-                        ) : (
-                          <div className="p-4 text-sm text-gray-500 text-center italic">
-                            {selectedClient ?
-                              'Nenhum orçamento encontrado para este cliente.' :
-                              'Selecione um cliente para ver os orçamentos'}
-                          </div>
-                        );
-                      })()
-                    )}
+                <label className="flex-1 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="type"
+                    value="avulso"
+                    checked={appointmentType === 'avulso'}
+                    onChange={() => {
+                      setAppointmentType('avulso');
+                      setSelectedItem(null);
+                    }}
+                    className="peer sr-only"
+                  />
+                  <div className="w-full py-2.5 text-sm font-medium text-center rounded-lg text-gray-500 peer-checked:bg-[#0B2A5B] peer-checked:text-white peer-checked:shadow-sm transition-all duration-200">
+                    Avulso
                   </div>
-                )}
+                </label>
               </div>
             </div>
+
+            {appointmentType !== 'avulso' && (
+              <div className="flex flex-col gap-2" ref={dropdownRef}>
+                <label className="text-sm font-semibold text-[#111418]">
+                  {appointmentType === 'service' ? 'Serviço' : 'Orçamento'}
+                </label>
+                <div className="relative">
+                  <div
+                    className="w-full bg-gray-50 text-[#111418] text-sm rounded-xl border-0 ring-1 ring-gray-200 focus:ring-2 focus:ring-primary pl-4 pr-10 py-3.5 cursor-pointer flex items-center justify-between"
+                    onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                  >
+                    <span className={!selectedItem ? "text-gray-400" : ""}>
+                      {selectedItem ? (appointmentType === 'service' ? selectedItem.title : selectedItem.title) : (appointmentType === 'service' ? 'Selecione um serviço...' : 'Selecione um orçamento...')}
+                    </span>
+                    <span className={`material-symbols-outlined text-gray-500 text-[20px] transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}>
+                      expand_more
+                    </span>
+                  </div>
+
+                  {isDropdownOpen && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-30 animate-in fade-in zoom-in-95 duration-100 max-h-48 overflow-y-auto">
+                      {appointmentType === 'service' ? (
+                        services.map((service) => (
+                          <button
+                            key={service.id}
+                            className="w-full text-left px-4 py-2.5 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg"
+                            onClick={() => {
+                              setSelectedItem(service);
+                              setIsDropdownOpen(false);
+                            }}
+                          >
+                            {service.title} ({service.duration_minutes}m)
+                          </button>
+                        ))
+                      ) : (
+                        (() => {
+                          const filtered = quotes.filter(quote => {
+                            if (!selectedClient) return true;
+                            return String(quote.client_id) === String(selectedClient.id);
+                          });
+
+                          return filtered.length > 0 ? (
+                            filtered.map((quote) => (
+                              <button
+                                key={quote.id}
+                                className="w-full text-left px-4 py-3 text-sm text-[#111418] hover:bg-gray-50 transition-colors first:rounded-t-lg last:rounded-b-lg border-b border-gray-50 last:border-0 flex justify-between items-center group"
+                                onClick={() => {
+                                  setSelectedItem(quote);
+                                  setIsDropdownOpen(false);
+                                }}
+                              >
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-gray-900 group-hover:text-[#0B2A5B] transition-colors">
+                                    Orçamento #{quote.id.substr(0, 8)}
+                                  </span>
+                                  <span className="text-xs text-gray-500">
+                                    {quote.total_amount ? `R$ ${quote.total_amount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : 'R$ 0,00'}
+                                  </span>
+                                </div>
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${quote.statusColor || 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                                  {quote.statusLabel || quote.status}
+                                </span>
+                              </button>
+                            ))
+                          ) : (
+                            <div className="p-4 text-sm text-gray-500 text-center italic">
+                              {selectedClient ?
+                                'Nenhum orçamento encontrado para este cliente.' :
+                                'Selecione um cliente para ver os orçamentos'}
+                            </div>
+                          );
+                        })()
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex flex-col gap-5">
