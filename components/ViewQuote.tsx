@@ -66,6 +66,7 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
           .select('*')
           .eq('id', quoteData.user_id)
           .single();
+        console.log('Company data loaded:', profileData); // Debug
         if (profileData) setCompany(profileData);
       }
 
@@ -199,9 +200,11 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
               </div>
               <h2 className="text-2xl font-bold text-[#0B2A5B] tracking-tight mb-2">{company?.company_name || 'Nome da Empresa'}</h2>
               <div className="text-xs text-gray-500 space-y-1 font-medium">
-                <p>CNPJ: {company?.cnpj || '00.000.000/0000-00'}</p>
-                <p>{company?.address || 'Endereço não informado'}</p>
-                <p>{company?.company_phone || '(00) 00000-0000'}</p>
+                {company?.cnpj && <p>CNPJ: {company.cnpj}</p>}
+                {company?.professional_id && <p>{company.professional_id}</p>}
+                {company?.address && <p>{company.address}</p>}
+                {company?.company_phone && <p>Tel: {company.company_phone}</p>}
+                {company?.company_email && <p>Email: {company.company_email}</p>}
               </div>
             </div>
 
@@ -279,6 +282,16 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
                 Baixar PDF
               </button>
             </div>
+
+            {/* Additional Notes Footer */}
+            {company?.quote_notes && (
+              <div className="mt-8 pt-6 border-t border-gray-100">
+                <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">Informações Adicionais</h3>
+                <div className="text-xs text-gray-600 whitespace-pre-wrap leading-relaxed">
+                  {company.quote_notes}
+                </div>
+              </div>
+            )}
 
             <div className="mt-8 text-center print:fixed print:bottom-0 print:left-0 print:w-full print:pb-8">
               <p className="text-[10px] text-gray-400 italic">

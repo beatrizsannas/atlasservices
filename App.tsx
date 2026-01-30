@@ -31,6 +31,7 @@ import { EditService } from './components/EditService';
 import { AppointmentDetails } from './components/AppointmentDetails';
 import { Finance } from './components/Finance';
 import { NewTransaction } from './components/NewTransaction';
+import { TransactionDetails } from './components/TransactionDetails';
 import { AdvancedFilter } from './components/AdvancedFilter';
 import { Login } from './components/Login';
 import { SignUp } from './components/SignUp';
@@ -44,7 +45,7 @@ import { Reschedule } from './components/Reschedule';
 import { MonthlyProgressScreen } from './components/MonthlyProgressScreen';
 import { CacheProvider } from './contexts/CacheContext';
 
-export type Screen = 'dashboard' | 'clients' | 'client-details' | 'inventory' | 'quotes' | 'new-quote' | 'quote-add-item' | 'quote-item-avulso' | 'quote-select-service' | 'quote-select-equipment' | 'view-quote' | 'schedule' | 'settings' | 'premium' | 'new-part' | 'new-category' | 'company-details' | 'user-profile' | 'new-appointment' | 'new-client' | 'services' | 'new-service' | 'edit-service' | 'appointment-details' | 'finance' | 'new-transaction' | 'advanced-filter' | 'login' | 'signup' | 'forgot-password' | 'email-sent-success' | 'email-sent-error' | 'new-password' | 'welcome' | 'signup-success' | 'reschedule' | 'monthly-progress';
+export type Screen = 'dashboard' | 'clients' | 'client-details' | 'inventory' | 'quotes' | 'new-quote' | 'quote-add-item' | 'quote-item-avulso' | 'quote-select-service' | 'quote-select-equipment' | 'view-quote' | 'schedule' | 'settings' | 'premium' | 'new-part' | 'new-category' | 'company-details' | 'user-profile' | 'new-appointment' | 'new-client' | 'services' | 'new-service' | 'edit-service' | 'appointment-details' | 'finance' | 'new-transaction' | 'transaction-details' | 'advanced-filter' | 'login' | 'signup' | 'forgot-password' | 'email-sent-success' | 'email-sent-error' | 'new-password' | 'welcome' | 'signup-success' | 'reschedule' | 'monthly-progress';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -55,6 +56,7 @@ const App: React.FC = () => {
   const [currentQuoteId, setCurrentQuoteId] = useState<string | null>(null);
   const [currentClientId, setCurrentClientId] = useState<string | null>(null);
   const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
+  const [currentTransactionId, setCurrentTransactionId] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
   const [quoteSource, setQuoteSource] = useState<'dashboard' | 'quotes'>('quotes');
@@ -377,12 +379,25 @@ const App: React.FC = () => {
           <Finance
             onBack={() => handleNavigate('dashboard')}
             onNewTransaction={() => handleNavigate('new-transaction')}
+            onTransactionClick={(transactionId) => {
+              setCurrentTransactionId(transactionId);
+              handleNavigate('transaction-details');
+            }}
           />
         )}
 
         {currentScreen === 'new-transaction' && (
           <NewTransaction onBack={() => handleNavigate('finance')} />
         )}
+
+        {currentScreen === 'transaction-details' && currentTransactionId && (
+          <TransactionDetails
+            transactionId={currentTransactionId}
+            onBack={() => handleNavigate('finance')}
+            onUpdate={() => {/* refresh finance data if needed */ }}
+          />
+        )}
+
 
         {currentScreen === 'settings' && (
           <Settings

@@ -5,6 +5,7 @@ import { FinanceReports } from './FinanceReports';
 interface FinanceProps {
   onBack: () => void;
   onNewTransaction: () => void;
+  onTransactionClick?: (transactionId: string) => void;
 }
 
 interface Transaction {
@@ -17,7 +18,7 @@ interface Transaction {
   notes: string;
 }
 
-export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) => {
+export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction, onTransactionClick }) => {
   const [activeFilter, setActiveFilter] = useState('Todos');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -156,13 +157,17 @@ export const Finance: React.FC<FinanceProps> = ({ onBack, onNewTransaction }) =>
               transactions.map(transaction => (
                 <TransactionItem
                   key={transaction.id}
-                  icon={transaction.type === 'income' ? (transaction.category === 'service' ? 'computer' : 'attach_money') : 'shopping_cart'} // Simplified icon logic
+                  icon={transaction.type === 'income' ? (transaction.category === 'service' ? 'computer' : 'attach_money') : 'shopping_cart'}
                   title={transaction.title}
                   date={new Date(transaction.date + 'T00:00:00').toLocaleDateString('pt-BR')}
                   amount={`${transaction.type === 'income' ? '+' : '-'} R$ ${transaction.amount.toFixed(2).replace('.', ',')}`}
                   type={transaction.type}
                   iconBg={transaction.type === 'income' ? "bg-sky-blue/20" : "bg-red-100"}
                   iconColor={transaction.type === 'income' ? "text-primary" : "text-red-600"}
+                  onClick={() => {
+                    console.log('Transaction clicked:', transaction.id);
+                    onTransactionClick?.(transaction.id);
+                  }}
                 />
               ))
             )}
@@ -193,10 +198,11 @@ interface TransactionItemProps {
   type: 'income' | 'expense';
   iconBg: string;
   iconColor: string;
+  onClick?: () => void;
 }
 
-const TransactionItem: React.FC<TransactionItemProps> = ({ icon, title, date, amount, type, iconBg, iconColor }) => (
-  <div className="flex items-center justify-between p-4 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-primary/20 transition-colors cursor-pointer">
+const TransactionItem: React.FC<TransactionItemProps> = ({ icon, title, date, amount, type, iconBg, iconColor, onClick }) => (
+  <div className="flex items-center justify-between p-4 rounded-xl bg-white border border-gray-100 shadow-sm hover:border-primary/20 transition-colors cursor-pointer" onClick={onClick}>
     <div className="flex items-center gap-4">
       <div className={`h-10 w-10 rounded-full flex items-center justify-center ${iconBg} ${iconColor}`}>
         <span className="material-symbols-outlined">{icon}</span>
