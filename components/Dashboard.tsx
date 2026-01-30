@@ -8,12 +8,18 @@ interface DashboardProps {
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
-  const { dashboardData, setDashboardData } = useCache();
-  // If we have data, we are not loading (visually), but we might be refreshing in bg
-  const loading = !dashboardData;
+  const { dashboardData, setDashboardData, isStale } = useCache();
+  // If we have data, we are not loading. If we don't, we are.
+  const [loading, setLoading] = React.useState(!dashboardData);
 
   useEffect(() => {
-    fetchDashboardData();
+    // Cache First Strategy
+    if (!dashboardData || isStale(dashboardData.lastUpdated)) {
+      setLoading(true);
+      fetchDashboardData();
+    } else {
+      setLoading(false);
+    }
   }, []);
 
   const fetchDashboardData = async () => {
@@ -66,7 +72,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         // 3. Monthly Progress (Yearly Data)
         supabase
           .from('appointments')
-          .select('id, date')
+          .from('appointments')
+          .select('id, date, total_amount')
           .eq('user_id', user.id)
           .gte('date', startOfYearStr)
           .lte('date', endOfYearStr)
@@ -100,12 +107,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       let monthlyStats: { label: string, count: number, fullDate: string }[] = [];
       if (yearCompletedRes.data) {
         const counts = Array(12).fill(0);
+        const revenues = Array(12).fill(0);
+
         yearCompletedRes.data.forEach((app: any) => {
           if (!app.date) return;
           const parts = app.date.split('-');
           if (parts.length > 1) {
             const mIndex = parseInt(parts[1], 10) - 1;
-            if (mIndex >= 0 && mIndex < 12) counts[mIndex]++;
+            if (mIndex >= 0 && mIndex < 12) {
+              counts[mIndex]++;
+              revenues[mIndex] += (app.total_amount || 0);
+            }
           }
         });
 
@@ -113,8 +125,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         monthlyStats = monthLabels.map((label, idx) => ({
           label,
           count: counts[idx],
+          revenue: revenues[idx],
           fullDate: new Date(year, idx, 1).toISOString()
-        })).slice(0, 6);
+        })).slice(0, 12); // Keep all 12 months for the details screen, even if we only show 6 in graph
       }
 
       // Process Agenda
@@ -155,6 +168,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -233,7 +248,7 @@ const MonthlyProgress: React.FC<{ onNavigate: (screen: Screen) => void, data: { 
           <p className="text-xs text-gray-500 mt-1">Total de {totalServices} serviços</p>
         </div>
         <button
-          onClick={() => onNavigate('finance')}
+          onClick={() => onNavigate('monthly-progress')}
           className="text-primary text-sm font-medium hover:underline"
         >
           Ver tudo

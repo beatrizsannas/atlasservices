@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Screen } from '../App';
+import { useCache } from '../contexts/CacheContext';
+import { supabase } from '../supabaseClient'; // In case we need to fetch if cache is empty
 
 interface MonthlyProgressScreenProps {
   onBack: () => void;
@@ -7,6 +9,26 @@ interface MonthlyProgressScreenProps {
 }
 
 export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ onBack, onNavigate }) => {
+  const { dashboardData, isStale } = useCache();
+  const [loading, setLoading] = useState(!dashboardData);
+  // We'll use local state for data if we need to fetch it (though we should have it from Dashboard)
+  // If user lands here directly (unlikely) or cache is cleared, we might need a fallback fetch or just redirect.
+  // For now, let's assume dashboardData is populated or we wait for it if we were to implement fetching here.
+  // But to keep it simple and given the architecture, if no data, maybe show empty or "Loading..." (and maybe trigger dashboard fetch?)
+
+  const stats = dashboardData?.monthlyStats || [];
+
+  // Create a reversed list for the "List" view (Newest first)
+  // Filter out future months? Or just show till current month?
+  const currentMonthIndex = new Date().getMonth();
+  const validStats = stats.slice(0, currentMonthIndex + 1);
+  const reversedStats = [...validStats].reverse();
+
+  const totalServices = validStats.reduce((acc, curr) => acc + curr.count, 0);
+
+  // Find max for chart scaling
+  const maxCount = Math.max(...stats.map(s => s.count), 5);
+
   return (
     <div className="flex flex-col min-h-screen bg-background-light font-display text-[#111418] pb-32">
       <div className="sticky top-0 z-50 bg-[#0B2A5B] px-4 py-4 shadow-md flex items-center justify-between text-white pb-safe pt-safe">
@@ -21,6 +43,7 @@ export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ on
       </div>
 
       <main className="flex flex-col gap-6 px-4 pt-6">
+        {/* Chart Section */}
         <section className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
           <div className="flex justify-between items-start mb-6">
             <div>
@@ -34,81 +57,89 @@ export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ on
           </div>
           <div className="overflow-x-auto no-scrollbar pb-2 -mx-2 px-2">
             <div className="h-48 min-w-[500px] flex items-end justify-between gap-3 pt-4">
-              <Bar height="h-16" label="Mai" />
-              <Bar height="h-20" label="Jun" />
-              <Bar height="h-24" label="Jul" opacity="bg-sky-blue/40" />
-              <Bar height="h-28" label="Ago" opacity="bg-sky-blue/40" />
-              <Bar height="h-24" label="Set" opacity="bg-sky-blue/50" />
-              <Bar height="h-32" label="Out" opacity="bg-sky-blue/50" />
-              <Bar height="h-36" label="Nov" opacity="bg-sky-blue/60" />
-              <Bar height="h-28" label="Dez" opacity="bg-sky-blue/60" />
-              <Bar height="h-24" label="Jan" opacity="bg-sky-blue/30" />
-              <Bar height="h-32" label="Fev" opacity="bg-sky-blue/50" />
-              <div className="flex flex-col items-center gap-2 flex-1 group">
-                <div className="w-full bg-sky-blue/80 rounded-t-lg relative h-20 transition-all hover:bg-primary/80">
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10">20 serviços</div>
-                </div>
-                <span className="text-[10px] font-medium text-gray-500 uppercase">Mar</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 flex-1 group">
-                <div className="w-full bg-primary rounded-t-lg relative h-40 transition-all shadow-md shadow-primary/20">
-                  <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-100 transition-opacity whitespace-nowrap z-10">45 serviços</div>
-                </div>
-                <span className="text-[10px] font-bold text-primary uppercase">Abr</span>
-              </div>
+              {stats.slice(Math.max(0, currentMonthIndex - 5), currentMonthIndex + 1).map((month, index) => {
+                // Determine checking isCurrent by comparing index with slice length or month label?
+                // month.label is unique in stats usually.
+                const isCurrent = month.label === stats[currentMonthIndex]?.label;
+                const maxVal = Math.max(...stats.map(s => s.count), 1);
+                const heightPercent = (month.count / maxVal) * 100;
+
+                return (
+                  <div key={month.label} className="flex flex-col items-center gap-2 flex-1 group h-full justify-end">
+                    {month.count > 0 ? (
+                      <div
+                        className="w-4 rounded-t-full relative transition-all duration-500 hover:opacity-80 bg-[#8FD9F6]"
+                        style={{ height: `${heightPercent}%` }}
+                      >
+                        {/* Tooltip on hover only */}
+                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
+                          {month.count} serviços
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-4 h-0" />
+                    )}
+                    <span className={`text-[10px] font-medium uppercase ${isCurrent ? 'text-primary' : 'text-gray-400'}`}>{month.label}</span>
+
+                  </div>
+                );
+              })}
             </div>
           </div>
         </section>
 
+        {/* Monthly Details List */}
         <section className="flex flex-col gap-4">
-          <MonthlyCard
-            month="Abril 2024"
-            isCurrent
-            services="45"
-            growth="12%"
-            growthPositive
-            revenue="R$ 5.4k"
-            icon="calendar_month"
-            iconBg="bg-primary/10"
-            iconColor="text-primary"
-          />
-          <MonthlyCard
-            month="Março 2024"
-            services="20"
-            growth="-5%"
-            growthPositive={false}
-            revenue="R$ 2.8k"
-            icon="history"
-            iconBg="bg-gray-50"
-            iconColor="text-gray-500"
-          />
-          <MonthlyCard
-            month="Fevereiro 2024"
-            services="32"
-            growth="8%"
-            growthPositive
-            revenue="R$ 4.1k"
-            icon="history"
-            iconBg="bg-gray-50"
-            iconColor="text-gray-500"
-          />
-          <MonthlyCard
-            month="Janeiro 2024"
-            services="24"
-            growth="0%"
-            isNeutral
-            revenue="R$ 3.0k"
-            icon="history"
-            iconBg="bg-gray-50"
-            iconColor="text-gray-500"
-          />
+          {reversedStats.map((month, index) => {
+            // reversedStats[index] is the current item.
+            // We need to compare with the PREVIOUS month chronologically.
+            // In reversed list, the "next" item (index + 1) is the previous month chronologically.
+            const prevMonth = reversedStats[index + 1];
+
+            let growth = 0;
+            let growthPositive = true;
+            let isNeutral = true;
+
+            if (prevMonth && prevMonth.count > 0) {
+              growth = Math.round(((month.count - prevMonth.count) / prevMonth.count) * 100);
+              isNeutral = growth === 0;
+              growthPositive = growth > 0;
+            } else if (prevMonth && prevMonth.count === 0 && month.count > 0) {
+              growth = 100; // technically infinite, but show 100% or something
+              isNeutral = false;
+              growthPositive = true;
+            } else if (!prevMonth) {
+              isNeutral = true; // No previous data
+            }
+
+            const isCurrent = month.label === stats[currentMonthIndex]?.label;
+            const fullYear = new Date().getFullYear(); // simplifying year
+
+            return (
+              <MonthlyCard
+                key={month.label}
+                month={`${getFullMonthName(month.label)} ${fullYear}`}
+                isCurrent={isCurrent}
+                services={month.count.toString()}
+                growth={`${growth > 0 ? '+' : ''}${growth}%`}
+                growthPositive={growthPositive}
+                isNeutral={isNeutral}
+                revenue={`R$ ${(month.revenue || 0).toLocaleString('pt-BR', { notation: 'compact', maximumFractionDigits: 1 })}`}
+                icon="calendar_month"
+                iconBg={isCurrent ? "bg-primary/10" : "bg-gray-50"}
+                iconColor={isCurrent ? "text-primary" : "text-gray-500"}
+              />
+            );
+          })}
         </section>
       </main>
 
       <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 z-50 pb-safe">
         <div className="relative flex justify-between items-center px-6 h-[72px]">
           <div className="absolute -top-7 left-1/2 -translate-x-1/2">
-            <button className="flex items-center justify-center h-[60px] w-[60px] rounded-full bg-[#0B2A5B] text-white shadow-lg shadow-[#0B2A5B]/30 border-4 border-white hover:scale-105 transition-transform">
+            <button
+              onClick={() => onNavigate('new-appointment')}
+              className="flex items-center justify-center h-[60px] w-[60px] rounded-full bg-[#0B2A5B] text-white shadow-lg shadow-[#0B2A5B]/30 border-4 border-white hover:scale-105 transition-transform">
               <span className="material-symbols-outlined" style={{ fontSize: '32px' }}>add</span>
             </button>
           </div>
@@ -135,12 +166,13 @@ export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ on
   );
 };
 
-const Bar: React.FC<{ height: string; label: string; opacity?: string }> = ({ height, label, opacity }) => (
-  <div className="flex flex-col items-center gap-2 flex-1 group">
-    <div className={`w-full ${opacity || 'bg-sky-blue/30'} rounded-t-lg relative ${height} transition-all hover:bg-primary/80`}></div>
-    <span className="text-[10px] font-medium text-gray-400 uppercase">{label}</span>
-  </div>
-);
+const getFullMonthName = (shortLabel: string) => {
+  const map: Record<string, string> = {
+    'Jan': 'Janeiro', 'Fev': 'Fevereiro', 'Mar': 'Março', 'Abr': 'Abril', 'Mai': 'Maio', 'Jun': 'Junho',
+    'Jul': 'Julho', 'Ago': 'Agosto', 'Set': 'Setembro', 'Out': 'Outubro', 'Nov': 'Novembro', 'Dez': 'Dezembro'
+  };
+  return map[shortLabel] || shortLabel;
+}
 
 interface MonthlyCardProps {
   month: string;
@@ -186,10 +218,10 @@ const MonthlyCard: React.FC<MonthlyCardProps> = ({
             </span>
           )}
           <p className={`text-xl font-bold ${isNeutral
-              ? 'text-gray-500'
-              : growthPositive
-                ? 'text-green-600'
-                : 'text-red-500'
+            ? 'text-gray-500'
+            : growthPositive
+              ? 'text-green-600'
+              : 'text-red-500'
             }`}>
             {growth}
           </p>

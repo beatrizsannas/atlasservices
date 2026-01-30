@@ -26,8 +26,8 @@ export const NewService: React.FC<NewServiceProps> = ({ onBack, onSave }) => {
     // Easier to just rewrite the form part with controlled inputs
 
     const handleSave = async () => {
-        if (!formData.title || !formData.price || !formData.time) {
-            showAlert('Atenção', 'Por favor, preencha todos os campos obrigatórios.', 'warning');
+        if (!formData.title || !formData.price) {
+            showAlert('Atenção', 'Por favor, preencha os campos obrigatórios (Nome e Valor).', 'warning');
             return;
         }
 
@@ -37,8 +37,12 @@ export const NewService: React.FC<NewServiceProps> = ({ onBack, onSave }) => {
             if (!user) throw new Error('Usuário não autenticado');
 
             // Convert HH:mm to minutes
-            const [hours, minutes] = formData.time.split(':').map(Number);
-            const totalMinutes = (hours * 60) + minutes;
+            // Convert HH:mm to minutes
+            let totalMinutes = 0;
+            if (formData.time) {
+                const [hours, minutes] = formData.time.split(':').map(Number);
+                totalMinutes = (hours * 60) + minutes;
+            }
 
             const { error } = await supabase.from('services').insert({
                 user_id: user.id,
@@ -50,8 +54,12 @@ export const NewService: React.FC<NewServiceProps> = ({ onBack, onSave }) => {
 
             if (error) throw error;
 
-            if (onSave) onSave(); // This usually just refreshes list
-            onBack();
+            if (onSave) onSave();
+
+            await showAlert('Sucesso', 'Serviço salvo com sucesso!', 'success');
+            setTimeout(() => {
+                onBack();
+            }, 1000);
         } catch (error: any) {
             console.error('Error saving service:', error);
             showAlert('Erro', 'Erro ao salvar serviço: ' + error.message, 'error');

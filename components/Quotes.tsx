@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAlert } from '../contexts/AlertContext';
+import { useCache } from '../contexts/CacheContext';
 
 interface QuotesProps {
   onBack: () => void;
@@ -14,15 +15,32 @@ interface QuotesProps {
 // ... imports
 
 export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, onEditQuote, onViewQuote, onScheduleQuote }) => {
-  const [quotes, setQuotes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { quotesCache, setQuotesCache, isStale, invalidateCache } = useCache();
+  const [quotes, setQuotes] = useState<any[]>(quotesCache?.data || []);
+  const [loading, setLoading] = useState(!quotesCache?.data);
   const [filter, setFilter] = useState('Todos');
   const [search, setSearch] = useState('');
   const [activeMenuQuoteId, setActiveMenuQuoteId] = useState<string | null>(null);
   const { showAlert, showConfirm } = useAlert();
 
   useEffect(() => {
-    fetchQuotes();
+    // Only fetch if no cache or stale or filter changed (though filter is client-side usually? 
+    // Wait, the original code had server-side filtering for status. 
+    // For performance, we should fetch ALL and filter client-side if possible, OR utilize cache for 'Todos' and fetch if specific filter?
+    // The implementation plan suggested fetching in background. 
+
+    // Let's adopt a hybrid: If 'Todos' and cache exists, use it. If specific filter, maybe still fetch or filter locally if we have all.
+    // The previous implementation fetched from DB on filter change.
+    // To optimize, let's fetch ALL quotes once, cache them, and do client-side filtering for status!
+    // This will be much faster.
+
+    if (!quotesCache || isStale(quotesCache.lastUpdated)) {
+      fetchQuotes();
+    } else {
+      // If we have cache, update local state
+      setQuotes(quotesCache.data);
+      setLoading(false);
+    }
 
     // Close menu on click outside
     const handleClickOutside = () => setActiveMenuQuoteId(null);
@@ -31,12 +49,12 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
   }, [filter]);
 
   const fetchQuotes = async () => {
-    // ... existing fetch logic
     try {
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      // Always fetch all to enable client-side filtering and caching
       let query = supabase
         .from('quotes')
         .select(`
@@ -49,17 +67,6 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
             `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-
-      if (filter !== 'Todos') {
-        let statusFilter = '';
-        if (filter === 'Pendentes') statusFilter = 'pending';
-        else if (filter === 'Aprovados') statusFilter = 'approved';
-        else if (filter === 'Cancelados') statusFilter = 'cancelled';
-
-        if (statusFilter) {
-          query = query.eq('status', statusFilter);
-        }
-      }
 
       const { data, error } = await query;
 
@@ -91,7 +98,9 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
             rawStatus: q.status
           };
         });
+
         setQuotes(formattedQuotes);
+        setQuotesCache(formattedQuotes);
       }
     } catch (error) {
       console.error('Error loading quotes:', error);
@@ -130,7 +139,15 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
     setActiveMenuQuoteId(activeMenuQuoteId === id ? null : id);
   }
 
-  const filteredQuotes = quotes.filter(q => q.client.toLowerCase().includes(search.toLowerCase()));
+  // Client-side filtering
+  const filteredQuotes = quotes.filter(q => {
+    const matchesSearch = q.client.toLowerCase().includes(search.toLowerCase());
+    if (filter === 'Todos') return matchesSearch;
+    if (filter === 'Pendentes') return matchesSearch && q.rawStatus === 'pending';
+    if (filter === 'Aprovados') return matchesSearch && q.rawStatus === 'approved';
+    if (filter === 'Cancelados') return matchesSearch && q.rawStatus === 'cancelled';
+    return matchesSearch;
+  });
 
   const handleCardClick = (id: string) => {
     if (onViewQuote) onViewQuote(id);

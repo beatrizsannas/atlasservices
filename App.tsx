@@ -57,6 +57,7 @@ const App: React.FC = () => {
   const [currentAppointmentId, setCurrentAppointmentId] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [serviceToEdit, setServiceToEdit] = useState<Service | null>(null);
+  const [quoteSource, setQuoteSource] = useState<'dashboard' | 'quotes'>('quotes');
   const [currentPartId, setCurrentPartId] = useState<string | null>(null);
 
   const isAuthScreen = currentScreen === 'login' || currentScreen === 'signup' || currentScreen === 'forgot-password' || currentScreen === 'email-sent-success' || currentScreen === 'email-sent-error' || currentScreen === 'new-password' || currentScreen === 'welcome' || currentScreen === 'signup-success' || currentScreen === 'reschedule';
@@ -100,6 +101,7 @@ const App: React.FC = () => {
 
   const handleEditQuote = (quoteId: string) => {
     setCurrentQuoteId(quoteId);
+    setQuoteSource('quotes');
     handleNavigate('new-quote');
   };
 
@@ -110,6 +112,7 @@ const App: React.FC = () => {
 
   const handleNewQuote = () => {
     setCurrentQuoteId(null);
+    setQuoteSource('quotes');
     handleNavigate('new-quote');
   };
 
@@ -300,7 +303,7 @@ const App: React.FC = () => {
         {currentScreen === 'new-quote' && (
           <NewQuote
             quoteId={currentQuoteId}
-            onBack={() => handleNavigate('quotes')}
+            onBack={() => handleNavigate(quoteSource === 'dashboard' ? 'dashboard' : 'quotes')}
             onGenerate={(date: string, quoteId?: string) => {
               setQuoteValidityDate(date);
               if (quoteId) setCurrentQuoteId(quoteId);
@@ -404,7 +407,13 @@ const App: React.FC = () => {
           <QuickActions
             isOpen={isQuickActionsOpen}
             onClose={() => setIsQuickActionsOpen(false)}
-            onNavigate={handleNavigate}
+            onNavigate={(screen) => {
+              if (screen === 'new-quote') {
+                setCurrentQuoteId(null);
+                setQuoteSource('dashboard');
+              }
+              handleNavigate(screen);
+            }}
           />
         )}
 
