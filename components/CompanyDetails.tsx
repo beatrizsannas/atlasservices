@@ -199,15 +199,22 @@ export const CompanyDetails: React.FC<CompanyDetailsProps> = ({ onBack }) => {
               onChange={handleChange}
             />
 
-            <InputGroup
-              label="Número do Profissional"
-              placeholder="Exemplo CREA-PE 123456"
-              type="text"
-              name="professional_id"
-              value={formData.professional_id}
-              onChange={handleChange}
-              tooltip="Número de registro do órgão de formação (Ex: CREA)"
-            />
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-1.5 ml-1">
+                <label className="text-sm font-semibold text-gray-700">Número do Profissional</label>
+                <div className="group relative flex items-center">
+                  <span className="material-symbols-outlined text-gray-400 text-[18px] cursor-help hover:text-primary transition-colors">help</span>
+                </div>
+              </div>
+              <input
+                className="w-full rounded-lg border-gray-200 bg-gray-50 text-[#111418] text-base p-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none placeholder:text-gray-400"
+                placeholder="Registro ou Identificação"
+                type="text"
+                name="professional_id"
+                value={formData.professional_id}
+                onChange={handleChange}
+              />
+            </div>
 
             <InputGroup
               label="Telefone Comercial"
@@ -290,40 +297,16 @@ const InputGroup: React.FC<{
   name: string;
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  tooltip?: string;
-}> = ({ label, placeholder, type, name, value, onChange, tooltip }) => {
-  const [showTooltip, setShowTooltip] = useState(false);
-
-  return (
-    <div className="space-y-1.5">
-      <div className="flex items-center gap-1.5 ml-1">
-        <label className="text-sm font-semibold text-gray-700">{label}</label>
-        {tooltip && (
-          <div className="group relative flex items-center">
-            <button
-              onClick={() => setShowTooltip(!showTooltip)}
-              className="flex items-center justify-center hover:bg-gray-100 rounded-full w-6 h-6 transition-colors"
-              type="button"
-            >
-              <span className={`material-symbols-outlined text-[18px] transition-colors ${showTooltip ? 'text-primary' : 'text-gray-400'}`}>help</span>
-            </button>
-            {showTooltip && (
-              <div className="absolute left-0 bottom-full mb-2 w-48 bg-gray-900 text-white text-xs p-2 rounded-lg shadow-lg z-10 animate-fade-in">
-                {tooltip}
-                <div className="absolute -bottom-1 left-2 w-2 h-2 bg-gray-900 rotate-45"></div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-      <input
-        className="w-full rounded-lg border-gray-200 bg-gray-50 text-[#111418] text-base p-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none placeholder:text-gray-400"
-        placeholder={placeholder}
-        type={type}
-        name={name}
-        value={value}
-        onChange={onChange}
-      />
-    </div>
-  );
-};
+}> = ({ label, placeholder, type, name, value, onChange }) => (
+  <div className="space-y-1.5">
+    <label className="text-sm font-semibold text-gray-700 ml-1">{label}</label>
+    <input
+      className="w-full rounded-lg border-gray-200 bg-gray-50 text-[#111418] text-base p-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none placeholder:text-gray-400"
+      placeholder={placeholder}
+      type={type}
+      name={name}
+      value={value}
+      onChange={onChange}
+    />
+  </div>
+);

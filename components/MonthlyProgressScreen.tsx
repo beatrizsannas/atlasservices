@@ -57,30 +57,23 @@ export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ on
           </div>
           <div className="overflow-x-auto no-scrollbar pb-2 -mx-2 px-2">
             <div className="h-48 min-w-[500px] flex items-end justify-between gap-3 pt-4">
-              {stats.slice(Math.max(0, currentMonthIndex - 5), currentMonthIndex + 1).map((month, index) => {
-                // Determine checking isCurrent by comparing index with slice length or month label?
-                // month.label is unique in stats usually.
-                const isCurrent = month.label === stats[currentMonthIndex]?.label;
-                const maxVal = Math.max(...stats.map(s => s.count), 1);
-                const heightPercent = (month.count / maxVal) * 100;
+              {stats.map((month, index) => {
+                const isCurrent = index === currentMonthIndex;
+                const heightPercent = (month.count / maxCount) * 100;
+                const heightClass = `h-[${Math.max(Math.floor(heightPercent), 10)}%]`; // Tailwind might not support dynamic arb values well without full JIT on style
 
+                // Using style for height to be precise
                 return (
-                  <div key={month.label} className="flex flex-col items-center gap-2 flex-1 group h-full justify-end">
-                    {month.count > 0 ? (
-                      <div
-                        className="w-4 rounded-t-full relative transition-all duration-500 hover:opacity-80 bg-[#8FD9F6]"
-                        style={{ height: `${heightPercent}%` }}
-                      >
-                        {/* Tooltip on hover only */}
-                        <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-10 pointer-events-none">
-                          {month.count} serviços
-                        </div>
+                  <div key={index} className="flex flex-col items-center gap-2 flex-1 group">
+                    <div
+                      className={`w-full rounded-t-lg relative transition-all hover:bg-primary/80 ${isCurrent ? 'bg-primary shadow-md shadow-primary/20' : 'bg-sky-blue/40'}`}
+                      style={{ height: `${Math.max(heightPercent, 8)}%` }}
+                    >
+                      <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded transition-opacity whitespace-nowrap z-10 ${isCurrent ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+                        {month.count} serviços
                       </div>
-                    ) : (
-                      <div className="w-4 h-0" />
-                    )}
-                    <span className={`text-[10px] font-medium uppercase ${isCurrent ? 'text-primary' : 'text-gray-400'}`}>{month.label}</span>
-
+                    </div>
+                    <span className={`text-[10px] font-medium uppercase ${isCurrent ? 'text-primary font-bold' : 'text-gray-400'}`}>{month.label}</span>
                   </div>
                 );
               })}

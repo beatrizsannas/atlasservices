@@ -72,7 +72,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         // 3. Monthly Progress (Yearly Data)
         supabase
           .from('appointments')
-          .from('appointments')
           .select('id, date, total_amount')
           .eq('user_id', user.id)
           .gte('date', startOfYearStr)

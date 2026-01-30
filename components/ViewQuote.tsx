@@ -199,11 +199,9 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
               </div>
               <h2 className="text-2xl font-bold text-[#0B2A5B] tracking-tight mb-2">{company?.company_name || 'Nome da Empresa'}</h2>
               <div className="text-xs text-gray-500 space-y-1 font-medium">
-                {company?.cnpj && <p>CNPJ: {company.cnpj}</p>}
-                {company?.professional_id && <p>Registro: {company.professional_id}</p>}
-                {company?.address && <p>{company.address}</p>}
-                {company?.company_phone && <p>{company.company_phone}</p>}
-                {company?.company_email && <p>{company.company_email}</p>}
+                <p>CNPJ: {company?.cnpj || '00.000.000/0000-00'}</p>
+                <p>{company?.address || 'Endereço não informado'}</p>
+                <p>{company?.company_phone || '(00) 00000-0000'}</p>
               </div>
             </div>
 
@@ -264,16 +262,6 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
                 <span className="text-2xl font-bold text-[#0B2A5B] whitespace-nowrap">R$ {formatCurrency(total)}</span>
               </div>
             </div>
-
-            {/* Additional Notes Section */}
-            {company?.quote_notes && (
-              <div className="mt-8 border-t border-gray-100 pt-6">
-                <h3 className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">Dados Adicionais</h3>
-                <p className="text-xs text-gray-500 whitespace-pre-line leading-relaxed">
-                  {company.quote_notes}
-                </p>
-              </div>
-            )}
 
             <div className="mt-8 pt-6 border-t border-gray-100 flex flex-col gap-3 print:hidden">
               <button
