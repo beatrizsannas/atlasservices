@@ -208,7 +208,7 @@ export const CompanyDetails: React.FC<CompanyDetailsProps> = ({ onBack }) => {
               </div>
               <input
                 className="w-full rounded-lg border-gray-200 bg-gray-50 text-[#111418] text-base p-3.5 focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all outline-none placeholder:text-gray-400"
-                placeholder="Registro ou Identificação"
+                placeholder="Exemplo: CREA-PE 123456"
                 type="text"
                 name="professional_id"
                 value={formData.professional_id}

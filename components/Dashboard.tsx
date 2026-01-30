@@ -72,7 +72,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
         // 3. Monthly Progress (Yearly Data)
         supabase
           .from('appointments')
-          .select('id, date, total_amount')
+          .select('id, date')
           .eq('user_id', user.id)
           .gte('date', startOfYearStr)
           .lte('date', endOfYearStr)
@@ -102,8 +102,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       const scheduledCount = scheduledRes.count || 0;
       const completedCount = completedMonthRes.count || 0;
 
+      console.log('Year completed data:', yearCompletedRes.data);
+      console.log('Year completed count:', yearCompletedRes.data?.length);
+
       // Process Monthly Stats
-      let monthlyStats: { label: string, count: number, fullDate: string }[] = [];
+      let monthlyStats: { label: string, count: number, revenue: number, fullDate: string }[] = [];
       if (yearCompletedRes.data) {
         const counts = Array(12).fill(0);
         const revenues = Array(12).fill(0);
@@ -115,7 +118,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
             const mIndex = parseInt(parts[1], 10) - 1;
             if (mIndex >= 0 && mIndex < 12) {
               counts[mIndex]++;
-              revenues[mIndex] += (app.total_amount || 0);
+              // Revenue will be 0 until we add price tracking to appointments
+              revenues[mIndex] += 0;
             }
           }
         });
@@ -126,7 +130,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           count: counts[idx],
           revenue: revenues[idx],
           fullDate: new Date(year, idx, 1).toISOString()
-        })).slice(0, 12); // Keep all 12 months for the details screen, even if we only show 6 in graph
+        })); // Show all 12 months
+
+        console.log('Monthly stats processed:', monthlyStats);
       }
 
       // Process Agenda
@@ -227,10 +233,13 @@ const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed 
   );
 };
 
-const MonthlyProgress: React.FC<{ onNavigate: (screen: Screen) => void, data: { label: string, count: number }[] }> = ({ onNavigate, data }) => {
+const MonthlyProgress: React.FC<{ onNavigate: (screen: Screen) => void, data: { label: string, count: number, revenue?: number }[] }> = ({ onNavigate, data }) => {
   // Find max for scaling
   const maxCount = Math.max(...data.map(d => d.count), 5);
   const totalServices = data.reduce((acc, curr) => acc + curr.count, 0);
+
+  console.log('MonthlyProgress received data:', data);
+  console.log('Total services:', totalServices);
 
   // Helper to determine color based on index or logic. 
   // The image implies a progression or just active vs inactive. 
@@ -253,7 +262,7 @@ const MonthlyProgress: React.FC<{ onNavigate: (screen: Screen) => void, data: { 
           Ver tudo
         </button>
       </div>
-      <div className="h-48 w-full flex items-end justify-between gap-4 px-2">
+      <div className="h-48 w-full flex items-end justify-between gap-2">{/* Reduced gap to fit all 12 months */}
         {data.length === 0 ? (
           <div className="w-full h-full flex items-center justify-center">
             <p className="text-xs text-gray-400">Sem dados</p>

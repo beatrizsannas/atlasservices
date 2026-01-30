@@ -417,7 +417,7 @@ const App: React.FC = () => {
           />
         )}
 
-        {!isAuthScreen && currentScreen !== 'view-quote' && currentScreen !== 'new-quote' && currentScreen !== 'premium' && currentScreen !== 'new-part' && currentScreen !== 'new-category' && currentScreen !== 'company-details' && currentScreen !== 'user-profile' && currentScreen !== 'new-appointment' && currentScreen !== 'new-client' && currentScreen !== 'services' && currentScreen !== 'new-service' && currentScreen !== 'edit-service' && currentScreen !== 'appointment-details' && currentScreen !== 'new-transaction' && currentScreen !== 'schedule' && currentScreen !== 'clients' && currentScreen !== 'settings' && currentScreen !== 'quote-add-item' && currentScreen !== 'quote-item-avulso' && currentScreen !== 'quote-select-service' && currentScreen !== 'quote-select-equipment' && currentScreen !== 'advanced-filter' && currentScreen !== 'monthly-progress' && currentScreen !== 'quotes' && (
+        {!isAuthScreen && ['dashboard', 'schedule', 'clients', 'settings'].includes(currentScreen) && (
           <BottomNav
             currentScreen={currentScreen}
             onNavigate={handleNavigate}
