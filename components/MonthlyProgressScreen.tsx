@@ -17,6 +17,8 @@ export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ on
   // But to keep it simple and given the architecture, if no data, maybe show empty or "Loading..." (and maybe trigger dashboard fetch?)
 
   const stats = dashboardData?.monthlyStats || [];
+  console.log('MonthlyProgressScreen - stats:', stats); // Debug
+  console.log('MonthlyProgressScreen - dashboardData:', dashboardData); // Debug
 
   // Create a reversed list for the "List" view (Newest first)
   // Filter out future months? Or just show till current month?
@@ -38,7 +40,7 @@ export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ on
         >
           <span className="material-symbols-outlined text-white" style={{ fontSize: '24px' }}>arrow_back</span>
         </button>
-        <h1 className="text-lg font-bold">Progresso Mensal</h1>
+        <h1 className="text-lg font-bold">Progresso</h1>
         <div className="w-10"></div>
       </div>
 
@@ -55,29 +57,44 @@ export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ on
               <span className="text-[10px] font-medium text-gray-600">Serviços</span>
             </div>
           </div>
-          <div className="overflow-x-auto no-scrollbar pb-2 -mx-2 px-2">
-            <div className="h-48 min-w-[500px] flex items-end justify-between gap-3 pt-4">
-              {stats.map((month, index) => {
-                const isCurrent = index === currentMonthIndex;
-                const heightPercent = (month.count / maxCount) * 100;
-                const heightClass = `h-[${Math.max(Math.floor(heightPercent), 10)}%]`; // Tailwind might not support dynamic arb values well without full JIT on style
+          <div className="h-48 w-full flex items-end justify-between gap-2">{/* Reduced gap to fit all 12 months */}
+            {stats.length === 0 ? (
+              <div className="w-full h-full flex items-center justify-center">
+                <p className="text-xs text-gray-400">Sem dados</p>
+              </div>
+            ) : (
+              stats.map((item, index) => {
+                const heightPercent = (item.count / maxCount) * 100;
+                const isCurrentMonth = index === currentMonthIndex;
 
-                // Using style for height to be precise
+                // Same color logic as Dashboard
+                let barColor = "bg-[#E0F2FE]"; // Default light
+                if (index === 1) barColor = "bg-[#BAE6FD]";
+                if (index === 2) barColor = "bg-[#7DD3FC]";
+
+                if (isCurrentMonth || item.count > 0) {
+                  barColor = "bg-[#0B2A5B]";
+                } else if (index > 2) {
+                  barColor = "bg-[#E0F2FE]";
+                }
+
                 return (
-                  <div key={index} className="flex flex-col items-center gap-2 flex-1 group">
+                  <div key={index} className="flex flex-col items-center gap-3 w-full h-full justify-end group cursor-pointer">
                     <div
-                      className={`w-full rounded-t-lg relative transition-all hover:bg-primary/80 ${isCurrent ? 'bg-primary shadow-md shadow-primary/20' : 'bg-sky-blue/40'}`}
+                      className={`w-full ${barColor} rounded-t-2xl relative transition-all hover:opacity-90`}
                       style={{ height: `${Math.max(heightPercent, 8)}%` }}
                     >
-                      <div className={`absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded transition-opacity whitespace-nowrap z-10 ${isCurrent ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
-                        {month.count} serviços
+                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-gray-900 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
+                        {item.count} serviços
                       </div>
                     </div>
-                    <span className={`text-[10px] font-medium uppercase ${isCurrent ? 'text-primary font-bold' : 'text-gray-400'}`}>{month.label}</span>
+                    <span className={`text-[10px] font-medium uppercase ${isCurrentMonth ? 'text-primary font-bold' : 'text-gray-400'}`}>
+                      {item.label}
+                    </span>
                   </div>
                 );
-              })}
-            </div>
+              })
+            )}
           </div>
         </section>
 
