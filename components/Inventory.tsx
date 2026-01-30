@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
+import { AlertDialog, AlertType } from './ui/AlertDialog';
 
 interface InventoryProps {
   onBack: () => void;
@@ -23,6 +24,19 @@ export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart, onEditP
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('Todos');
+  const [alertState, setAlertState] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: AlertType;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info',
+    onConfirm: () => { }
+  });
 
   useEffect(() => {
     fetchParts();
@@ -63,16 +77,30 @@ export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart, onEditP
     return matchesSearch && matchesFilter;
   });
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('Tem certeza que deseja excluir esta peça?')) return;
-    try {
-      const { error } = await supabase.from('inventory_parts').delete().eq('id', id);
-      if (error) throw error;
-      fetchParts();
-    } catch (error) {
-      console.error('Error deleting part:', error);
-      alert('Erro ao excluir peça.');
-    }
+  const handleDelete = (id: string) => {
+    setAlertState({
+      isOpen: true,
+      title: 'Excluir Peça',
+      message: 'Tem certeza que deseja excluir esta peça?',
+      type: 'confirm',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase.from('inventory_parts').delete().eq('id', id);
+          if (error) throw error;
+          fetchParts();
+          setAlertState(prev => ({ ...prev, isOpen: false }));
+        } catch (error) {
+          console.error('Error deleting part:', error);
+          setAlertState({
+            isOpen: true,
+            title: 'Erro',
+            message: 'Erro ao excluir peça.',
+            type: 'error',
+            onConfirm: () => setAlertState(prev => ({ ...prev, isOpen: false }))
+          });
+        }
+      }
+    });
   };
 
   return (
@@ -149,6 +177,15 @@ export const Inventory: React.FC<InventoryProps> = ({ onBack, onNewPart, onEditP
           )}
         </div>
       </main>
+
+      <AlertDialog
+        isOpen={alertState.isOpen}
+        title={alertState.title}
+        message={alertState.message}
+        type={alertState.type}
+        onConfirm={alertState.onConfirm}
+        onCancel={() => setAlertState(prev => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 };

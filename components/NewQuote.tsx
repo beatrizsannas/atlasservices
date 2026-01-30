@@ -47,7 +47,20 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
   useEffect(() => {
     fetchDependencies();
     if (quoteId) {
+      console.log('NewQuote mounted with quoteId:', quoteId);
       fetchQuoteDetails();
+    } else {
+      // Reset state if no quoteId (new quote mode)
+      setItems([]);
+      setSelectedClientId('');
+      setClientSearch('');
+      setSelectedClientName('');
+      setDiscount(0);
+      setValidityDate(() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 15);
+        return d.toISOString().split('T')[0];
+      });
     }
   }, [quoteId]);
 

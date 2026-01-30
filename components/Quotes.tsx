@@ -201,6 +201,7 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
             <div
               key={quote.id}
               className="bg-white rounded-xl shadow-sm border border-gray-100 relative active:scale-[0.99] transition-transform"
+              style={{ zIndex: activeMenuQuoteId === quote.id ? 50 : 'auto' }}
             >
               {/* Main Clickable Area (Everything except top right menu area) */}
               <div
@@ -235,7 +236,8 @@ export const Quotes: React.FC<QuotesProps> = ({ onBack, onNewQuote, onFilter, on
                 {/* Dropdown Menu */}
                 {activeMenuQuoteId === quote.id && (
                   <div
-                    className="absolute top-10 right-0 bg-white rounded-xl shadow-xl py-2 w-48 z-30 border border-gray-100 animate-in fade-in zoom-in-95 duration-100"
+                    className="absolute top-10 right-0 bg-white rounded-xl shadow-xl py-2 w-48 z-30 border border-gray-100 origin-top-right animate-in fade-in zoom-in-95 duration-200"
+
                     onClick={(e) => e.stopPropagation()}
                   >
                     <button

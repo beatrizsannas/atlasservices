@@ -213,8 +213,14 @@ const App: React.FC = () => {
         {currentScreen === 'new-appointment' && (
           <NewAppointment
             onBack={() => {
-              setCurrentQuoteId(null); // Clear quote ID on back
-              handleNavigate('schedule');
+              if (currentQuoteId) {
+                // If we started from a quote, go back to quotes list
+                setCurrentQuoteId(null);
+                handleNavigate('quotes');
+              } else {
+                // Otherwise go back to schedule
+                handleNavigate('schedule');
+              }
             }}
             initialQuoteId={currentQuoteId}
           />
