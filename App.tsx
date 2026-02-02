@@ -63,6 +63,11 @@ const App: React.FC = () => {
   const [quoteSource, setQuoteSource] = useState<'dashboard' | 'quotes'>('quotes');
   const [currentPartId, setCurrentPartId] = useState<string | null>(null);
 
+  // Schedule State (Lifted to preserve navigation state)
+  const [scheduleActiveTab, setScheduleActiveTab] = useState('Hoje');
+  const [scheduleStartDate, setScheduleStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [scheduleEndDate, setScheduleEndDate] = useState(new Date().toISOString().split('T')[0]);
+
   const isAuthScreen = currentScreen === 'login' || currentScreen === 'signup' || currentScreen === 'forgot-password' || currentScreen === 'email-sent-success' || currentScreen === 'email-sent-error' || currentScreen === 'new-password' || currentScreen === 'welcome' || currentScreen === 'signup-success' || currentScreen === 'reschedule';
 
   useEffect(() => {
@@ -191,7 +196,10 @@ const App: React.FC = () => {
         )}
 
         {currentScreen === 'reschedule' && (
-          <Reschedule onBack={() => handleNavigate('schedule')} />
+          <Reschedule
+            onBack={() => handleNavigate('schedule')}
+            appointmentId={currentAppointmentId}
+          />
         )}
 
         {currentScreen === 'dashboard' && (
@@ -219,9 +227,18 @@ const App: React.FC = () => {
 
         {currentScreen === 'schedule' && (
           <Schedule
+            activeTab={scheduleActiveTab}
+            setActiveTab={setScheduleActiveTab}
+            startDate={scheduleStartDate}
+            setStartDate={setScheduleStartDate}
+            endDate={scheduleEndDate}
+            setEndDate={setScheduleEndDate}
             onNewAppointment={() => handleNavigate('new-appointment')}
             onAppointmentClick={(id) => handleViewAppointment(id)}
-            onReschedule={() => handleNavigate('reschedule')}
+            onReschedule={(appointmentId) => {
+              setCurrentAppointmentId(appointmentId);
+              handleNavigate('reschedule');
+            }}
             onBack={() => handleNavigate('dashboard')}
           />
         )}

@@ -1,10 +1,81 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
 
 interface RescheduleProps {
   onBack: () => void;
+  appointmentId?: string;
 }
 
-export const Reschedule: React.FC<RescheduleProps> = ({ onBack }) => {
+export const Reschedule: React.FC<RescheduleProps> = ({ onBack, appointmentId }) => {
+  const [loading, setLoading] = useState(true);
+  const [appointmentData, setAppointmentData] = useState<any>(null);
+
+  useEffect(() => {
+    if (appointmentId) {
+      fetchAppointmentData();
+    }
+  }, [appointmentId]);
+
+  const fetchAppointmentData = async () => {
+    try {
+      setLoading(true);
+      // Fetch appointment first without join
+      const { data: appointment, error: appError } = await supabase
+        .from('appointments')
+        .select('*')
+        .eq('id', appointmentId)
+        .single();
+
+      if (appError) throw appError;
+
+      // If we have an appointment, try to fetch client details separately if client_id exists
+      if (appointment) {
+        let clientData = null;
+
+        if (appointment.client_id) {
+          const { data: client, error: clientError } = await supabase
+            .from('clients')
+            .select('*')
+            .eq('id', appointment.client_id)
+            .single();
+
+          if (!clientError) {
+            clientData = client;
+          }
+        }
+
+        // Combine data
+        setAppointmentData({
+          ...appointment,
+          clients: clientData
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching appointment:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T00:00:00');
+    const day = date.getDate();
+    const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+    const month = months[date.getMonth()];
+    return `${day} de ${month}`;
+  };
+
+  const formatTime = (timeStr: string) => {
+    if (!timeStr) return '';
+    return timeStr.substring(0, 5); // HH:MM
+  };
+
+  const getInitials = (name: string) => {
+    if (!name) return '??';
+    return name.substring(0, 2).toUpperCase();
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-background-light text-[#111418] font-display antialiased">
       <div className="relative flex h-full min-h-screen w-full flex-col overflow-x-hidden max-w-md mx-auto bg-background-light shadow-xl pb-24">
@@ -22,31 +93,43 @@ export const Reschedule: React.FC<RescheduleProps> = ({ onBack }) => {
 
         <main className="flex-1 flex flex-col gap-6 px-4 py-6">
           {/* Current Appointment Card */}
-          <div className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm border border-gray-100 opacity-70 hover:opacity-100 transition-opacity duration-300">
-            <div className="absolute top-0 left-0 w-1 h-full bg-gray-300"></div>
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Agendamento Atual</h3>
-                <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">
-                  Original
-                </span>
-              </div>
-              <div className="flex items-start gap-4 mt-1">
-                <div className="size-12 rounded-full bg-gray-200 bg-center bg-cover shadow-inner shrink-0" style={{ backgroundImage: 'url("https://lh3.googleusercontent.com/aida-public/AB6AXuAXaNc2ARxJ6KvD7LGucVUekfTg9nWW4BrQXNKYa318d9QFeZ9xr2bg6qf1S7mkUn5b-8Ii5JWUJ1NKXnVvpwPYpPgpL9Mw8FGQ6i_61hAV_W4e7bsu6vxbEEy6naFbgvdZDz1SA7J0cQlIc9K92_AdifW0A5IrUtnz-hQ6WV9LEC9Fk6fbpo2s_wmONDOQKTkYxIZVpow9hinJ8hO-RXoQBsK7G4vIMxw6pvcG8_Wh1GzCDx0PaQFhDWxObFIgaIF87iz8mdDR4wwG")' }}></div>
-                <div className="flex-1">
-                  <h2 className="text-base font-bold text-[#111418] leading-tight">Consultoria de Marketing</h2>
-                  <p className="text-sm text-gray-600 mt-0.5">Ana Silva</p>
+          {loading ? (
+            <div className="text-center py-10 text-gray-500">Carregando...</div>
+          ) : appointmentData ? (
+            <div className="relative overflow-hidden rounded-xl bg-white p-5 shadow-sm border border-gray-100 opacity-70 hover:opacity-100 transition-opacity duration-300">
+              <div className="absolute top-0 left-0 w-1 h-full bg-gray-300"></div>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-gray-500">Agendamento Atual</h3>
+                  <span className="inline-flex items-center rounded-md bg-gray-100 px-2 py-1 text-xs font-medium text-gray-600">
+                    Original
+                  </span>
+                </div>
+                <div className="flex items-start gap-4 mt-1">
+                  {appointmentData.clients?.avatar_url ? (
+                    <div className="size-12 rounded-full bg-gray-200 bg-center bg-cover shadow-inner shrink-0" style={{ backgroundImage: `url("${appointmentData.clients.avatar_url}")` }}></div>
+                  ) : (
+                    <div className="size-12 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shadow-inner shrink-0">
+                      {getInitials(appointmentData.clients?.name || '')}
+                    </div>
+                  )}
+                  <div className="flex-1">
+                    <h2 className="text-base font-bold text-[#111418] leading-tight">{appointmentData.title || 'Agendamento'}</h2>
+                    <p className="text-sm text-gray-600 mt-0.5">{appointmentData.clients?.name || 'Cliente'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 mt-2 pt-3 border-t border-gray-100 text-sm text-gray-600">
+                  <span className="material-symbols-outlined text-lg">event</span>
+                  <span className="font-medium">{formatDate(appointmentData.date)}</span>
+                  <span className="mx-1">•</span>
+                  <span className="material-symbols-outlined text-lg">schedule</span>
+                  <span className="font-medium">{formatTime(appointmentData.start_time)} - {formatTime(appointmentData.end_time)}</span>
                 </div>
               </div>
-              <div className="flex items-center gap-2 mt-2 pt-3 border-t border-gray-100 text-sm text-gray-600">
-                <span className="material-symbols-outlined text-lg">event</span>
-                <span className="font-medium">Hoje, 12 de Outubro</span>
-                <span className="mx-1">•</span>
-                <span className="material-symbols-outlined text-lg">schedule</span>
-                <span className="font-medium">09:00 - 10:00</span>
-              </div>
             </div>
-          </div>
+          ) : (
+            <div className="text-center py-10 text-gray-500">Agendamento não encontrado</div>
+          )}
 
           {/* New Date Selection */}
           <div>
@@ -95,7 +178,10 @@ export const Reschedule: React.FC<RescheduleProps> = ({ onBack }) => {
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-gray-600 ml-1">Horário Início</label>
                 <div className="relative">
-                  <select className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#111418] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm outline-none">
+                  <select
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#111418] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm outline-none"
+                    style={{ WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
+                  >
                     <option>09:00</option>
                     <option>09:30</option>
                     <option selected>10:00</option>
@@ -109,7 +195,10 @@ export const Reschedule: React.FC<RescheduleProps> = ({ onBack }) => {
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-gray-600 ml-1">Horário Término</label>
                 <div className="relative">
-                  <select className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#111418] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm outline-none">
+                  <select
+                    className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#111418] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm outline-none"
+                    style={{ WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
+                  >
                     <option>10:00</option>
                     <option>10:30</option>
                     <option selected>11:00</option>

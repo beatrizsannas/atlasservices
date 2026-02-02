@@ -3,25 +3,37 @@ import { supabase } from '../supabaseClient';
 import { useAlert } from '../contexts/AlertContext';
 
 interface ScheduleProps {
+  // Lifted state props
+  activeTab: string;
+  setActiveTab: (tab: string) => void;
+  startDate: string;
+  setStartDate: (date: string) => void;
+  endDate: string;
+  setEndDate: (date: string) => void;
+
   onNewAppointment?: () => void;
   onAppointmentClick?: (id: string) => void;
-  onReschedule?: () => void;
+  onReschedule?: (appointmentId: string) => void;
   onBack: () => void;
 }
 
-export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointmentClick, onReschedule, onBack }) => {
-  const [activeTab, setActiveTab] = useState('Hoje');
+export const Schedule: React.FC<ScheduleProps> = ({
+  activeTab, setActiveTab, startDate, setStartDate, endDate, setEndDate,
+  onNewAppointment, onAppointmentClick, onReschedule, onBack
+}) => {
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { showAlert } = useAlert();
 
-  // State for date inputs
-  const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+  // Calendar Modal States
 
-  const startDateInputRef = useRef<HTMLInputElement>(null);
-  const endDateInputRef = useRef<HTMLInputElement>(null);
+  // Calendar Modal States
+  const [showCalendar, setShowCalendar] = useState<boolean>(false);
+  const [activeDateField, setActiveDateField] = useState<'start' | 'end' | null>(null);
+  const [viewDate, setViewDate] = useState<Date>(new Date());
+
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
   useEffect(() => {
     fetchAppointments();
@@ -175,10 +187,93 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
     }
   };
 
-  const showDatePicker = (ref: React.RefObject<HTMLInputElement>) => {
-    if (ref.current) {
-      ref.current.showPicker();
+  const formatDateDisplay = (dateStr: string) => {
+    if (!dateStr) return '';
+    const date = new Date(dateStr + 'T12:00:00');
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = monthNames[date.getMonth()].substring(0, 3);
+    const year = date.getFullYear();
+    return `${day} ${month}, ${year}`;
+  };
+
+  const openCalendar = (field: 'start' | 'end') => {
+    const initialDateStr = field === 'start' ? startDate : endDate;
+    if (initialDateStr) {
+      setViewDate(new Date(initialDateStr + 'T12:00:00'));
+    } else {
+      setViewDate(new Date());
     }
+    setActiveDateField(field);
+    setShowCalendar(true);
+  };
+
+  const handleDateSelect = (day: number, type: 'prev' | 'current' | 'next') => {
+    let newDate = new Date(viewDate);
+
+    if (type === 'prev') {
+      newDate.setMonth(newDate.getMonth() - 1);
+    } else if (type === 'next') {
+      newDate.setMonth(newDate.getMonth() + 1);
+    }
+
+    newDate.setDate(day);
+
+    const year = newDate.getFullYear();
+    const month = String(newDate.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(newDate.getDate()).padStart(2, '0');
+    const dateString = `${year}-${month}-${dayStr}`;
+
+    if (activeDateField === 'start') {
+      setStartDate(dateString);
+    } else {
+      setEndDate(dateString);
+    }
+    setShowCalendar(false);
+    setActiveDateField(null);
+  };
+
+  const changeMonth = (offset: number) => {
+    const newDate = new Date(viewDate.getFullYear(), viewDate.getMonth() + offset, 1);
+    setViewDate(newDate);
+  };
+
+  const generateCalendarDays = () => {
+    const year = viewDate.getFullYear();
+    const month = viewDate.getMonth();
+
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    const days = [];
+
+    // Previous month days
+    for (let i = firstDay - 1; i >= 0; i--) {
+      days.push({ day: daysInPrevMonth - i, type: 'prev' });
+    }
+
+    // Current month days
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({ day: i, type: 'current' });
+    }
+
+    // Next month days
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({ day: i, type: 'next' });
+    }
+
+    return days;
+  };
+
+  const isSelected = (day: number, type: string) => {
+    if (type !== 'current') return false;
+
+    const currentTarget = activeDateField === 'start' ? startDate : endDate;
+    if (!currentTarget) return false;
+
+    const [y, m, d] = currentTarget.split('-').map(Number);
+    return y === viewDate.getFullYear() && m === (viewDate.getMonth() + 1) && d === day;
   };
 
   const handleTabClick = (tab: string) => {
@@ -278,7 +373,7 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
                   rawStatus={app.rawStatus}
 
                   onDetailsClick={() => onAppointmentClick && onAppointmentClick(app.id)}
-                  onReschedule={() => onReschedule && onReschedule()}
+                  onReschedule={() => onReschedule && onReschedule(app.id)}
                   onUpdateStatus={handleUpdateStatus}
                   onDelete={(id) => handleUpdateStatus(id, 'deleted')} // Map delete to status update for now, or implement hard delete
                 />
@@ -314,18 +409,11 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
                 <label className="block text-xs font-bold text-[#637188] uppercase tracking-wider mb-2">Data Início</label>
                 <div
                   className="group relative flex items-center bg-[#F6F7F8] border border-transparent focus-within:border-primary/50 focus-within:bg-white rounded-xl px-4 py-3.5 transition-all duration-200 cursor-pointer"
-                  onClick={() => showDatePicker(startDateInputRef)}
+                  onClick={() => openCalendar('start')}
                 >
                   <span className="material-symbols-outlined text-primary mr-3">calendar_today</span>
-                  <input
-                    ref={startDateInputRef}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
                   <div className={`flex-1 text-sm font-semibold ${startDate ? 'text-[#111418]' : 'text-gray-400'}`}>
-                    {startDate ? formatDate(startDate) : 'Selecionar data'}
+                    {startDate ? formatDateDisplay(startDate) : 'Selecionar data'}
                   </div>
                   <span className="material-symbols-outlined text-gray-400 text-sm">expand_more</span>
                 </div>
@@ -335,18 +423,11 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
                 <label className="block text-xs font-bold text-[#637188] uppercase tracking-wider mb-2">Data Fim</label>
                 <div
                   className="group relative flex items-center bg-[#F6F7F8] border border-transparent focus-within:border-primary/50 focus-within:bg-white rounded-xl px-4 py-3.5 transition-all duration-200 cursor-pointer"
-                  onClick={() => showDatePicker(endDateInputRef)}
+                  onClick={() => openCalendar('end')}
                 >
                   <span className="material-symbols-outlined text-primary mr-3">event</span>
-                  <input
-                    ref={endDateInputRef}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                  />
                   <div className={`flex-1 text-sm font-semibold ${endDate ? 'text-[#111418]' : 'text-gray-400 font-normal'}`}>
-                    {endDate ? formatDate(endDate) : 'Selecionar data'}
+                    {endDate ? formatDateDisplay(endDate) : 'Selecionar data'}
                   </div>
                   <span className="material-symbols-outlined text-gray-400 text-sm">expand_more</span>
                 </div>
@@ -359,6 +440,64 @@ export const Schedule: React.FC<ScheduleProps> = ({ onNewAppointment, onAppointm
             >
               <span>Aplicar Filtro</span>
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Calendar Modal */}
+      {showCalendar && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-sm bg-white rounded-2xl shadow-2xl p-4 animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            <div className="bg-white rounded-lg p-2">
+              <div className="flex items-center justify-between mb-4 px-1">
+                <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+                  <span className="material-symbols-outlined text-sm">chevron_left</span>
+                </button>
+                <span className="text-sm font-bold text-gray-900 capitalize">
+                  {monthNames[viewDate.getMonth()]} {viewDate.getFullYear()}
+                </span>
+                <button onClick={() => changeMonth(1)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
+                  <span className="material-symbols-outlined text-sm">chevron_right</span>
+                </button>
+              </div>
+
+              <div className="grid grid-cols-7 text-center mb-2">
+                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'].map((day) => (
+                  <span key={day} className="text-[10px] font-medium text-gray-400 uppercase">{day}</span>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 gap-y-2 gap-x-1">
+                {generateCalendarDays().map((dateObj, idx) => {
+                  const selected = isSelected(dateObj.day, dateObj.type as string);
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleDateSelect(dateObj.day, dateObj.type as 'prev' | 'current' | 'next')}
+                      disabled={dateObj.type !== 'current' && false}
+                      className={`
+                                h-8 w-8 mx-auto flex items-center justify-center text-xs rounded-full transition-all
+                                ${dateObj.type === 'current'
+                          ? selected
+                            ? 'bg-primary text-white font-bold shadow-md shadow-primary/30'
+                            : 'text-gray-700 hover:bg-gray-100'
+                          : 'text-gray-300'
+                        }
+                            `}
+                    >
+                      {dateObj.day}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => { setShowCalendar(false); setActiveDateField(null); }}
+                className="w-full mt-6 py-3 text-sm font-medium text-gray-500 hover:bg-gray-50 rounded-xl transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
         </div>
       )}
