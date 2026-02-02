@@ -43,9 +43,10 @@ import { Welcome } from './components/Welcome';
 import { SignUpSuccess } from './components/SignUpSuccess';
 import { Reschedule } from './components/Reschedule';
 import { MonthlyProgressScreen } from './components/MonthlyProgressScreen';
+import { CompletedServicesScreen } from './components/CompletedServicesScreen';
 import { CacheProvider } from './contexts/CacheContext';
 
-export type Screen = 'dashboard' | 'clients' | 'client-details' | 'inventory' | 'quotes' | 'new-quote' | 'quote-add-item' | 'quote-item-avulso' | 'quote-select-service' | 'quote-select-equipment' | 'view-quote' | 'schedule' | 'settings' | 'premium' | 'new-part' | 'new-category' | 'company-details' | 'user-profile' | 'new-appointment' | 'new-client' | 'services' | 'new-service' | 'edit-service' | 'appointment-details' | 'finance' | 'new-transaction' | 'transaction-details' | 'advanced-filter' | 'login' | 'signup' | 'forgot-password' | 'email-sent-success' | 'email-sent-error' | 'new-password' | 'welcome' | 'signup-success' | 'reschedule' | 'monthly-progress';
+export type Screen = 'dashboard' | 'clients' | 'client-details' | 'inventory' | 'quotes' | 'new-quote' | 'quote-add-item' | 'quote-item-avulso' | 'quote-select-service' | 'quote-select-equipment' | 'view-quote' | 'schedule' | 'settings' | 'premium' | 'new-part' | 'new-category' | 'company-details' | 'user-profile' | 'new-appointment' | 'new-client' | 'services' | 'new-service' | 'edit-service' | 'appointment-details' | 'finance' | 'new-transaction' | 'transaction-details' | 'advanced-filter' | 'login' | 'signup' | 'forgot-password' | 'email-sent-success' | 'email-sent-error' | 'new-password' | 'welcome' | 'signup-success' | 'reschedule' | 'monthly-progress' | 'completed-services';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
@@ -94,8 +95,11 @@ const App: React.FC = () => {
   const toggleSidebar = () => setIsSidebarOpen(!isSidebarOpen);
   const closeSidebar = () => setIsSidebarOpen(false);
 
-  const handleNavigate = (screen: Screen) => {
+  const handleNavigate = (screen: Screen, appointmentId?: string) => {
     setCurrentScreen(screen);
+    if (appointmentId) {
+      setCurrentAppointmentId(appointmentId);
+    }
     closeSidebar();
     setIsQuickActionsOpen(false); // Close quick actions if navigating
     window.scrollTo(0, 0);
@@ -201,6 +205,13 @@ const App: React.FC = () => {
 
         {currentScreen === 'monthly-progress' && (
           <MonthlyProgressScreen
+            onBack={() => handleNavigate('dashboard')}
+            onNavigate={handleNavigate}
+          />
+        )}
+
+        {currentScreen === 'completed-services' && (
+          <CompletedServicesScreen
             onBack={() => handleNavigate('dashboard')}
             onNavigate={handleNavigate}
           />

@@ -217,7 +217,13 @@ const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed 
             <p className="text-sm font-medium text-gray-500 leading-tight mt-1">Serviços agendados</p>
           </div>
         </div>
-        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
+        <div
+          onClick={() => {
+            console.log('Navigating to completed-services');
+            onNavigate('completed-services');
+          }}
+          className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 cursor-pointer hover:shadow-md transition-shadow"
+        >
           <div className="flex items-center justify-between">
             <div className="p-2 bg-sky-blue/20 rounded-lg">
               <span className="material-symbols-outlined text-primary" style={{ fontSize: '20px' }}>check_circle</span>

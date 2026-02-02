@@ -138,6 +138,7 @@ export const MonthlyProgressScreen: React.FC<MonthlyProgressScreenProps> = ({ on
                 icon="calendar_month"
                 iconBg={isCurrent ? "bg-primary/10" : "bg-gray-50"}
                 iconColor={isCurrent ? "text-primary" : "text-gray-500"}
+                onClick={() => onNavigate('completed-services')}
               />
             );
           })}
@@ -195,12 +196,16 @@ interface MonthlyCardProps {
   icon: string;
   iconBg: string;
   iconColor: string;
+  onClick?: () => void;
 }
 
 const MonthlyCard: React.FC<MonthlyCardProps> = ({
-  month, isCurrent, services, growth, growthPositive, isNeutral, revenue, icon, iconBg, iconColor
+  month, isCurrent, services, growth, growthPositive, isNeutral, revenue, icon, iconBg, iconColor, onClick
 }) => (
-  <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+  <div
+    onClick={onClick}
+    className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 cursor-pointer hover:shadow-md transition-shadow"
+  >
     <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
       <div className="flex items-center gap-3">
         <div className={`w-10 h-10 rounded-full ${iconBg} flex items-center justify-center`}>
