@@ -5,22 +5,21 @@ import { useCache } from '../contexts/CacheContext';
 
 interface DashboardProps {
   onNavigate: (screen: Screen) => void;
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
+export const Dashboard: React.FC<DashboardProps> = ({ onNavigate, selectedDate, onDateChange }) => {
   const { dashboardData, setDashboardData, isStale } = useCache();
   // If we have data, we are not loading. If we don't, we are.
   const [loading, setLoading] = React.useState(!dashboardData);
 
   useEffect(() => {
     // Cache First Strategy
-    if (!dashboardData || isStale(dashboardData.lastUpdated)) {
-      setLoading(true);
-      fetchDashboardData();
-    } else {
-      setLoading(false);
-    }
-  }, []);
+    // We strictly should check if cache matches the selected date, but for now invalidate if date changes
+    // or simply refetch always when date changes
+    fetchDashboardData();
+  }, [selectedDate]);
 
   const fetchDashboardData = async () => {
     try {
@@ -29,28 +28,30 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
       if (!user) return;
 
       const now = new Date();
-      // Use local date strings YYYY-MM-DD
+      // Today for "Scheduled Today" (always today regardless of filter)
       const year = now.getFullYear();
       const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
       const todayStr = `${year}-${month}-${day}`;
 
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      // Selected Month for "Completed"
+      const startOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
       const sm = String(startOfMonth.getMonth() + 1).padStart(2, '0');
       const sd = String(startOfMonth.getDate()).padStart(2, '0');
       const startOfMonthStr = `${startOfMonth.getFullYear()}-${sm}-${sd}`;
 
-      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const endOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
       const em = String(endOfMonth.getMonth() + 1).padStart(2, '0');
       const ed = String(endOfMonth.getDate()).padStart(2, '0');
       const endOfMonthStr = `${endOfMonth.getFullYear()}-${em}-${ed}`;
 
-      const startOfYearStr = `${year}-01-01`;
-      const endOfYearStr = `${year}-12-31`;
+      // Yearly data based on selected year
+      const startOfYearStr = `${selectedDate.getFullYear()}-01-01`;
+      const endOfYearStr = `${selectedDate.getFullYear()}-12-31`;
 
       // Parallelize requests
       const [scheduledRes, completedMonthRes, yearCompletedRes, agendaRes] = await Promise.all([
-        // 1. Daily Summary: Scheduled Today
+        // 1. Daily Summary: Scheduled Today (ALWAYS TODAY)
         supabase
           .from('appointments')
           .select('*', { count: 'exact', head: true })
@@ -59,7 +60,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
           .eq('status', 'scheduled')
           .neq('status', 'deleted'),
 
-        // 2. Monthly Summary: Completed This Month
+        // 2. Monthly Summary: Completed This Month (FILTERED)
         supabase
           .from('appointments')
           .select('*', { count: 'exact', head: true })
@@ -185,7 +186,14 @@ export const Dashboard: React.FC<DashboardProps> = ({ onNavigate }) => {
 
   return (
     <>
-      <DailySummary date={today} scheduled={stats.scheduled} completed={stats.completed} />
+      <DailySummary
+        date={today}
+        scheduled={stats.scheduled}
+        completed={stats.completed}
+        onNavigate={onNavigate}
+        selectedDate={selectedDate}
+        onDateChange={onDateChange}
+      />
       <MonthlyProgress onNavigate={onNavigate} data={stats.monthlyStats} />
       <DailyAgenda date={today} items={stats.agendaItems} loading={loading} />
     </>
@@ -196,9 +204,13 @@ interface DailySummaryProps {
   date: string;
   scheduled: number;
   completed: number;
+  onNavigate: (screen: Screen) => void;
+  selectedDate: Date;
+  onDateChange: (date: Date) => void;
 }
 
-const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed }) => {
+const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed, onNavigate, selectedDate, onDateChange }) => {
+
   return (
     <section>
       <div className="flex justify-between items-center mb-4">
@@ -231,7 +243,7 @@ const DailySummary: React.FC<DailySummaryProps> = ({ date, scheduled, completed 
           </div>
           <div>
             <p className="text-3xl font-bold text-[#111418]">{completed}</p>
-            <p className="text-sm font-medium text-gray-500 leading-tight mt-1">Realizados (Mês)</p>
+            <p className="text-sm font-medium text-gray-500 leading-tight mt-1">Realizados ({selectedDate.toLocaleDateString('pt-BR', { month: 'short' })})</p>
           </div>
         </div>
       </div>

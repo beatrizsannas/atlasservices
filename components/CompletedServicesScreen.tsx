@@ -5,6 +5,8 @@ import { Screen } from '../App';
 interface CompletedServicesScreenProps {
     onBack: () => void;
     onNavigate: (screen: Screen, appointmentId?: string) => void;
+    selectedDate?: Date; // Optional to not break strict usage if called without (though App.tsx handles it)
+    onDateChange?: (date: Date) => void;
 }
 
 interface CompletedService {
@@ -16,7 +18,13 @@ interface CompletedService {
     status: string;
 }
 
-export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = ({ onBack, onNavigate }) => {
+export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = ({ onBack, onNavigate, selectedDate: propDate, onDateChange }) => {
+    // Local state fallback if used independently, but App passes it.
+    const [localDate, setLocalDate] = useState(new Date());
+    const selectedDate = propDate || localDate;
+    const handleDateChange = onDateChange || setLocalDate;
+    const currentMonthValue = `${selectedDate.getFullYear()}-${String(selectedDate.getMonth() + 1).padStart(2, '0')}`;
+
     console.log('CompletedServicesScreen mounted');
     const [services, setServices] = useState<CompletedService[]>([]);
     const [loading, setLoading] = useState(true);
@@ -26,7 +34,7 @@ export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = (
     useEffect(() => {
         console.log('useEffect triggered');
         fetchCompletedServices();
-    }, []);
+    }, [selectedDate]);
 
     const fetchCompletedServices = async () => {
         try {
@@ -37,7 +45,7 @@ export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = (
                 return;
             }
 
-            const now = new Date();
+            const now = selectedDate; // Use selected Date
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
             const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
 
@@ -64,8 +72,8 @@ export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = (
             setTotalServices(currentCount);
 
             // Calculate growth
-            const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0);
+            const startOfPrevMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1, 1);
+            const endOfPrevMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 0);
             const prevStartDateStr = startOfPrevMonth.toISOString().split('T')[0];
             const prevEndDateStr = endOfPrevMonth.toISOString().split('T')[0];
 
@@ -91,13 +99,13 @@ export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = (
     };
 
     const getCurrentMonthYear = () => {
-        const now = new Date();
+        const now = selectedDate;
         const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
         return months[now.getMonth()];
     };
 
     const getPreviousMonthName = () => {
-        const now = new Date();
+        const now = selectedDate;
         const months = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
         const prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
         return months[prevMonth];
@@ -130,6 +138,20 @@ export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = (
                 </button>
                 <h1 className="text-lg font-bold text-center flex-1">Serviços Realizados</h1>
                 <div className="w-8"></div>
+            </div>
+            {/* Filter Section matching Dashboard */}
+            <div className="px-4 py-4 sticky top-[65px] z-40 bg-background-light border-b border-gray-100 flex justify-end">
+                <input
+                    type="month"
+                    value={currentMonthValue}
+                    onChange={(e) => {
+                        if (e.target.value) {
+                            const [y, m] = e.target.value.split('-');
+                            handleDateChange(new Date(parseInt(y), parseInt(m) - 1, 1));
+                        }
+                    }}
+                    className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary text-gray-600 shadow-sm"
+                />
             </div>
 
             {/* Content */}

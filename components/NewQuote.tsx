@@ -250,14 +250,51 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
     setSearchQuery('');
   }
 
-  const handleCustomAdd = (e: React.FormEvent) => {
+  const handleCustomAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     const form = e.target as HTMLFormElement;
     const name = (form.elements.namedItem('customName') as HTMLInputElement).value;
     const price = (form.elements.namedItem('customPrice') as HTMLInputElement).value;
+    const imageInput = form.elements.namedItem('customImage') as HTMLInputElement;
+    const imageFile = imageInput?.files?.[0];
+
+    let imageUrl = null;
+
+    if (imageFile) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const fileExt = imageFile.name.split('.').pop();
+          const fileName = `${user.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+          const { data, error } = await supabase.storage
+            .from('quote-items')
+            .upload(fileName, imageFile);
+
+          if (error) throw error;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('quote-items')
+            .getPublicUrl(fileName);
+
+          imageUrl = publicUrl;
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error);
+      }
+    }
 
     if (name && price) {
-      addItem({ name, price }, 'custom');
+      addItem({ name, price, image_url: imageUrl }, 'custom');
+      form.reset();
+      // Reset image preview
+      const container = document.getElementById('custom-image-container');
+      if (container) {
+        container.innerHTML = `
+          <span class="material-symbols-outlined text-3xl mb-1 group-hover:text-[#0B2A5B] transition-colors">photo_camera</span>
+          <span class="text-[10px] font-bold uppercase tracking-wide group-hover:text-[#0B2A5B] transition-colors">Adicionar Foto</span>
+        `;
+      }
     }
   }
 
@@ -354,6 +391,32 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
         if (deleteError) throw deleteError;
 
       } else {
+        // Generate quote number for new quotes
+        let quoteNumber = '';
+
+        // Get the last quote number for this user
+        const { data: lastQuote } = await supabase
+          .from('quotes')
+          .select('quote_number')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (lastQuote?.quote_number) {
+          // Extract the sequential number and increment
+          const match = lastQuote.quote_number.match(/ORC-\d+-(\d+)$/);
+          if (match) {
+            const nextNum = parseInt(match[1]) + 1;
+            quoteNumber = `ORC-${user.id.substring(0, 3).toUpperCase()}-${String(nextNum).padStart(4, '0')}`;
+          } else {
+            quoteNumber = `ORC-${user.id.substring(0, 3).toUpperCase()}-0001`;
+          }
+        } else {
+          // First quote for this user
+          quoteNumber = `ORC-${user.id.substring(0, 3).toUpperCase()}-0001`;
+        }
+
         // Insert
         const { data, error } = await supabase.from('quotes').insert({
           user_id: user.id,
@@ -361,7 +424,8 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
           valid_until: validityDate,
           total_amount: total,
           discount: discount,
-          status: 'pending'
+          status: 'pending',
+          quote_number: quoteNumber
         }).select().single();
 
         if (error) throw error;
@@ -615,31 +679,31 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
 
               <div className="flex flex-col gap-2">
                 {modalTab === 'service' && searchResults.map(item => (
-                  <button key={item.id} onClick={() => addItem(item, 'service')} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl border border-transparent hover:border-gray-100 text-left group transition-all">
-                    <div>
+                  <button key={item.id} onClick={() => addItem(item, 'service')} className="flex justify-between items-start gap-3 p-3 hover:bg-gray-50 rounded-xl border border-gray-100 text-left group transition-all">
+                    <div className="flex-1 min-w-0">
                       <div className="font-bold text-[#111418]">{item.title}</div>
                       <div className="text-xs text-gray-500 line-clamp-1">{item.description || 'Sem descrição'}</div>
                     </div>
-                    <div className="text-[#0B2A5B] font-bold">
+                    <div className="text-[#0B2A5B] font-bold whitespace-nowrap flex-shrink-0">
                       + R$ {item.price ? item.price.toFixed(2) : '0.00'}
                     </div>
                   </button>
                 ))}
                 {modalTab === 'part' && searchResults.map(item => (
-                  <button key={item.id} onClick={() => addItem(item, 'part')} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl border border-transparent hover:border-gray-100 text-left group transition-all">
-                    <div className="flex items-center gap-3">
+                  <button key={item.id} onClick={() => addItem(item, 'part')} className="flex justify-between items-start gap-3 p-3 hover:bg-gray-50 rounded-xl border border-gray-100 text-left group transition-all">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div
                         className="w-10 h-10 rounded-lg bg-gray-100 flex-shrink-0 bg-cover bg-center border border-gray-200 flex items-center justify-center"
                         style={item.image_url ? { backgroundImage: `url("${item.image_url}")` } : {}}
                       >
                         {!item.image_url && <span className="material-symbols-outlined text-gray-400 text-[20px]">inventory_2</span>}
                       </div>
-                      <div>
+                      <div className="min-w-0">
                         <div className="font-bold text-[#111418]">{item.name}</div>
                         <div className="text-xs text-gray-500">{item.category}</div>
                       </div>
                     </div>
-                    <div className="text-[#0B2A5B] font-bold">
+                    <div className="text-[#0B2A5B] font-bold whitespace-nowrap flex-shrink-0">
                       + R$ {item.sale_price ? item.sale_price.toFixed(2) : '0.00'}
                     </div>
                   </button>
@@ -655,6 +719,40 @@ export const NewQuote: React.FC<NewQuoteProps> = ({ onBack, onGenerate, quoteId 
                       <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Preço (R$)</label>
                       <input name="customPrice" type="number" step="0.01" required className="w-full p-3 bg-gray-50 rounded-xl border-none outline-none focus:ring-2 focus:ring-[#0B2A5B]/20" placeholder="0.00" />
                     </div>
+
+                    {/* Image Upload */}
+                    <div className="flex flex-col gap-2">
+                      <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Imagem (Opcional)</label>
+                      <div className="flex justify-center w-full">
+                        <div className="relative w-32 h-32 group">
+                          {/* Preview or Placeholder */}
+                          <div id="custom-image-container" className="w-full h-full bg-gray-50 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center justify-center text-gray-400 shadow-sm transition-all group-hover:bg-gray-100 group-hover:border-[#0B2A5B]/50 cursor-pointer">
+                            <span className="material-symbols-outlined text-3xl mb-1 group-hover:text-[#0B2A5B] transition-colors">photo_camera</span>
+                            <span className="text-[10px] font-bold uppercase tracking-wide group-hover:text-[#0B2A5B] transition-colors">Adicionar Foto</span>
+                          </div>
+                          <input
+                            name="customImage"
+                            type="file"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const reader = new FileReader();
+                                reader.onloadend = () => {
+                                  const container = document.getElementById('custom-image-container');
+                                  if (container) {
+                                    container.innerHTML = `<img src="${reader.result}" class="w-full h-full object-cover rounded-2xl border-2 border-gray-100" alt="Preview" />`;
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                              }
+                            }}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <button type="submit" className="w-full bg-[#0B2A5B] text-white font-bold py-3 rounded-xl shadow-lg mt-2">
                       Adicionar Item
                     </button>

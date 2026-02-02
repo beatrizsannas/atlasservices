@@ -38,7 +38,7 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
               <h3 className="text-primary font-bold text-lg mb-3 tracking-wide">Plano Profissional</h3>
               <div className="flex items-baseline gap-1 mb-4">
                 <span className="text-2xl font-bold text-gray-400">R$</span>
-                <span className="text-5xl font-bold text-gray-900">49,90</span>
+                <span className="text-5xl font-bold text-gray-900">39,90</span>
                 <span className="text-gray-400 font-medium">/mês</span>
               </div>
               <p className="text-center text-sm text-gray-500 mb-2">Ideal para profissionais autônomos em crescimento.</p>
@@ -56,30 +56,7 @@ export const Premium: React.FC<PremiumProps> = ({ onBack }) => {
             </div>
           </div>
 
-          {/* Card Empresarial */}
-          <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden relative opacity-90 hover:opacity-100 transition-opacity">
-            <div className="p-6 pb-4 flex flex-col items-center border-b border-gray-50">
-              <h3 className="text-gray-800 font-bold text-lg mb-3 tracking-wide">Plano Empresarial</h3>
-              <div className="flex items-baseline gap-1 mb-4">
-                <span className="text-2xl font-bold text-gray-400">R$</span>
-                <span className="text-5xl font-bold text-gray-900">89,90</span>
-                <span className="text-gray-400 font-medium">/mês</span>
-              </div>
-              <p className="text-center text-sm text-gray-500 mb-2">Para pequenas empresas e oficinas.</p>
-            </div>
-            <div className="p-6 bg-gray-50/50">
-              <ul className="space-y-3">
-                <FeatureItem text="Tudo do plano Profissional" />
-                <FeatureItem text="Múltiplos usuários" />
-                <FeatureItem text="Controle de estoque avançado" />
-                <FeatureItem text="Emissão de boletos" />
-                <FeatureItem text="Relatórios detalhados" />
-              </ul>
-              <button className="w-full mt-6 bg-white border border-gray-200 text-gray-700 font-bold py-3.5 rounded-xl hover:bg-gray-50 active:scale-[0.98] transition-all">
-                Falar com Vendas
-              </button>
-            </div>
-          </div>
+
         </div>
       </main>
     </div>

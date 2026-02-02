@@ -146,7 +146,14 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
   };
 
   const handlePrint = () => {
+    // Set document title for PDF filename
+    const originalTitle = document.title;
+    document.title = `Orçamento - ${quote?.quote_number || 'SEM-NUMERO'}`;
     window.print();
+    // Restore original title after print dialog
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 100);
   };
 
   if (loading && quoteId) {
@@ -214,6 +221,11 @@ export const ViewQuote: React.FC<ViewQuoteProps> = ({ onBack, validityDate, quot
                 <p className="font-bold text-gray-900 text-base">{client?.name || 'Cliente'}</p>
                 <p className="text-gray-500 mt-1">{client?.email || 'email@exemplo.com'}</p>
                 <p className="text-gray-500">{client?.phone || '(00) 00000-0000'}</p>
+                {quote?.quote_number && (
+                  <p className="text-primary font-semibold mt-2 text-sm">
+                    Orçamento Nº: {quote.quote_number}
+                  </p>
+                )}
               </div>
             </div>
 

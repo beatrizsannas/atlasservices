@@ -7,7 +7,7 @@ interface WelcomeProps {
 
 export const Welcome: React.FC<WelcomeProps> = ({ onNavigate }) => {
   return (
-    <div className="bg-background-light font-display text-[#111418] flex flex-col min-h-screen items-center justify-center p-0 sm:p-4">
+    <div className="bg-background-light font-display text-[#111418] fixed inset-0 flex items-center justify-center p-0 sm:p-4 overflow-hidden">
       <style>{`
         .float-slow {
             animation: float 8s ease-in-out infinite;
@@ -26,7 +26,7 @@ export const Welcome: React.FC<WelcomeProps> = ({ onNavigate }) => {
             100% { transform: translateY(0px); }
         }
       `}</style>
-      <div className="w-full max-w-md bg-white h-[100dvh] sm:h-auto sm:min-h-[800px] sm:rounded-[2rem] shadow-2xl relative overflow-hidden flex flex-col">
+      <div className="w-full max-w-md bg-white h-[100dvh] sm:h-auto sm:min-h-[800px] sm:rounded-[2rem] sm:shadow-2xl relative overflow-hidden flex flex-col">
         <div className="relative h-[55%] w-full overflow-hidden bg-gradient-to-b from-blue-50/80 via-white to-white">
           <div className="absolute top-[-20%] right-[-10%] w-80 h-80 bg-blue-100/50 rounded-full blur-3xl"></div>
           <div className="absolute top-[30%] left-[-20%] w-60 h-60 bg-indigo-50/50 rounded-full blur-3xl"></div>

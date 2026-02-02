@@ -50,7 +50,7 @@ export type Screen = 'dashboard' | 'clients' | 'client-details' | 'inventory' | 
 
 const App: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
-  const [currentScreen, setCurrentScreen] = useState<Screen>('dashboard');
+  const [currentScreen, setCurrentScreen] = useState<Screen>('welcome');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isQuickActionsOpen, setIsQuickActionsOpen] = useState(false);
   const [quoteValidityDate, setQuoteValidityDate] = useState('2023-11-24');
@@ -67,6 +67,9 @@ const App: React.FC = () => {
   const [scheduleActiveTab, setScheduleActiveTab] = useState('Hoje');
   const [scheduleStartDate, setScheduleStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [scheduleEndDate, setScheduleEndDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Dashboard State (Lifted to preserve filter state)
+  const [dashboardDate, setDashboardDate] = useState(new Date());
 
   const isAuthScreen = currentScreen === 'login' || currentScreen === 'signup' || currentScreen === 'forgot-password' || currentScreen === 'email-sent-success' || currentScreen === 'email-sent-error' || currentScreen === 'new-password' || currentScreen === 'welcome' || currentScreen === 'signup-success' || currentScreen === 'reschedule';
 
@@ -155,6 +158,16 @@ const App: React.FC = () => {
   return (
     <CacheProvider>
       <div className="min-h-screen bg-background-light relative">
+        {/* Show loading screen while checking authentication */}
+        {isLoadingSession && (
+          <div className="fixed inset-0 bg-[#0B2A5B] flex items-center justify-center z-50">
+            <div className="flex flex-col items-center gap-4">
+              <span className="material-symbols-outlined text-white text-6xl animate-spin">progress_activity</span>
+              <p className="text-white text-lg font-medium">Carregando...</p>
+            </div>
+          </div>
+        )}
+
         {!isAuthScreen && (
           <Sidebar
             isOpen={isSidebarOpen}
@@ -206,7 +219,11 @@ const App: React.FC = () => {
           <>
             <Header onProfileClick={toggleSidebar} />
             <main className="flex flex-col gap-6 px-4 pt-6 pb-32">
-              <Dashboard onNavigate={handleNavigate} />
+              <Dashboard
+                onNavigate={handleNavigate}
+                selectedDate={dashboardDate}
+                onDateChange={setDashboardDate}
+              />
             </main>
           </>
         )}
@@ -222,6 +239,8 @@ const App: React.FC = () => {
           <CompletedServicesScreen
             onBack={() => handleNavigate('dashboard')}
             onNavigate={handleNavigate}
+            selectedDate={dashboardDate}
+            onDateChange={setDashboardDate}
           />
         )}
 

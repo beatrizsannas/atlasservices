@@ -176,6 +176,19 @@ export const AdvancedFilter: React.FC<AdvancedFilterProps> = ({ onBack, onApply 
           </div>
         </div>
 
+        {/* Número do Orçamento */}
+        <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-4">
+          <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Número do Orçamento</h2>
+          <div className="relative">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">tag</span>
+            <input
+              className="w-full pl-10 pr-3 py-2.5 bg-gray-50 border-none rounded-lg text-sm focus:ring-2 focus:ring-primary/20 transition-all outline-none"
+              placeholder="Ex: ORC-ABC-0001"
+              type="text"
+            />
+          </div>
+        </div>
+
         {/* Faixa de Valor */}
         <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-4">
           <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wider">Faixa de Valor</h2>
