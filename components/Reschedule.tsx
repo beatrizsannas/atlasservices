@@ -178,35 +178,21 @@ export const Reschedule: React.FC<RescheduleProps> = ({ onBack, appointmentId })
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-gray-600 ml-1">Horário Início</label>
                 <div className="relative">
-                  <select
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#111418] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm outline-none"
-                    style={{ WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
-                  >
-                    <option>09:00</option>
-                    <option>09:30</option>
-                    <option selected>10:00</option>
-                    <option>10:30</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                    <span className="material-symbols-outlined text-lg">expand_more</span>
-                  </div>
+                  <input
+                    type="time"
+                    defaultValue="10:00"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#111418] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm outline-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                  />
                 </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium text-gray-600 ml-1">Horário Término</label>
                 <div className="relative">
-                  <select
-                    className="w-full appearance-none rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#111418] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm outline-none"
-                    style={{ WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
-                  >
-                    <option>10:00</option>
-                    <option>10:30</option>
-                    <option selected>11:00</option>
-                    <option>11:30</option>
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-gray-500">
-                    <span className="material-symbols-outlined text-lg">expand_more</span>
-                  </div>
+                  <input
+                    type="time"
+                    defaultValue="11:00"
+                    className="w-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm font-medium text-[#111418] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary shadow-sm outline-none [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden [&::-webkit-outer-spin-button]:hidden"
+                  />
                 </div>
               </div>
             </div>
