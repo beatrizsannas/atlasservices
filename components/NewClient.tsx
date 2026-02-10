@@ -41,7 +41,7 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack, clientId }) => {
       if (data) {
         setFormData({
           name: data.name || '',
-          phone: data.phone || '',
+          phone: formatPhoneNumber(data.phone || ''),
           email: data.email || '',
           address: data.address || '',
           number: data.number || '',
@@ -59,9 +59,35 @@ export const NewClient: React.FC<NewClientProps> = ({ onBack, clientId }) => {
     }
   };
 
+  const formatPhoneNumber = (value: string) => {
+    // Remove tudo que não é número
+    const numbers = value.replace(/\D/g, '');
+
+    // Limita a 11 dígitos (DDD + 9 dígitos)
+    const limitedNumbers = numbers.substring(0, 11);
+
+    // Aplica a formatação
+    if (limitedNumbers.length <= 2) {
+      return limitedNumbers;
+    } else if (limitedNumbers.length <= 6) {
+      return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2)}`;
+    } else if (limitedNumbers.length <= 10) {
+      return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2, 6)}-${limitedNumbers.substring(6)}`;
+    } else {
+      return `(${limitedNumbers.substring(0, 2)}) ${limitedNumbers.substring(2, 7)}-${limitedNumbers.substring(7, 11)}`;
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setFormData(prev => ({ ...prev, [id]: value }));
+
+    // Se for o campo de telefone, formata
+    if (id === 'phone') {
+      const formatted = formatPhoneNumber(value);
+      setFormData(prev => ({ ...prev, [id]: formatted }));
+    } else {
+      setFormData(prev => ({ ...prev, [id]: value }));
+    }
   };
 
   const handleSave = async () => {

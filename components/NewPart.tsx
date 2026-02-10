@@ -26,6 +26,7 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate, partId }) 
     imageUrl: ''
   });
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
   const { showAlert } = useAlert();
 
   React.useEffect(() => {
@@ -219,20 +220,60 @@ export const NewPart: React.FC<NewPartProps> = ({ onBack, onNavigate, partId }) 
             <div className="flex flex-col gap-2">
               <label className="text-sm font-medium text-gray-700" htmlFor="category">Categoria</label>
               <div className="relative">
-                <select
-                  className="w-full appearance-none bg-gray-50 text-gray-900 rounded-xl border-gray-200 focus:border-primary focus:ring-primary/50 py-3 px-4 text-base shadow-sm transition-colors pr-10 outline-none focus:ring-2 cursor-pointer"
-                  id="category"
-                  value={formData.category}
-                  onChange={handleChange}
+                <button
+                  type="button"
+                  onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                  className="w-full bg-gray-50 text-gray-900 rounded-xl border border-gray-200 focus:border-primary focus:ring-primary/50 py-3 px-4 text-base shadow-sm transition-colors outline-none focus:ring-2 cursor-pointer text-left flex items-center justify-between"
                 >
-                  <option disabled value="">Selecione uma categoria</option>
-                  <option value="eletrica">Elétrica</option>
-                  <option value="hidraulica">Hidráulica</option>
-                  <option value="acessorios">Acessórios em geral</option>
-                  <option value="informatica">Informática</option>
-                  <option value="outros">Outros</option>
-                </select>
-                {/* Custom arrow removed to avoid duplication if native one shows */}
+                  <span className={formData.category ? 'text-gray-900' : 'text-gray-400'}>
+                    {formData.category === 'eletrica' && 'Elétrica'}
+                    {formData.category === 'hidraulica' && 'Hidráulica'}
+                    {formData.category === 'acessorios' && 'Acessórios em geral'}
+                    {formData.category === 'informatica' && 'Informática'}
+                    {formData.category === 'outros' && 'Outros'}
+                    {!formData.category && 'Selecione uma categoria'}
+                  </span>
+                  <span className={`material-symbols-outlined text-gray-400 transition-transform ${isCategoryDropdownOpen ? 'rotate-180' : ''}`}>
+                    expand_more
+                  </span>
+                </button>
+
+                {isCategoryDropdownOpen && (
+                  <>
+                    {/* Backdrop to close dropdown */}
+                    <div
+                      className="fixed inset-0 z-10"
+                      onClick={() => setIsCategoryDropdownOpen(false)}
+                    />
+
+                    {/* Dropdown menu */}
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden z-20 max-h-60 overflow-y-auto">
+                      {[
+                        { value: 'eletrica', label: 'Elétrica' },
+                        { value: 'hidraulica', label: 'Hidráulica' },
+                        { value: 'acessorios', label: 'Acessórios em geral' },
+                        { value: 'informatica', label: 'Informática' },
+                        { value: 'outros', label: 'Outros' }
+                      ].map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => {
+                            setFormData(prev => ({ ...prev, category: option.value }));
+                            setIsCategoryDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors ${formData.category === option.value ? 'bg-primary/5 text-primary font-medium' : 'text-gray-900'
+                            }`}
+                        >
+                          {formData.category === option.value && (
+                            <span className="material-symbols-outlined text-primary text-[18px] mr-2 inline-block align-middle">check</span>
+                          )}
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             </div>
 

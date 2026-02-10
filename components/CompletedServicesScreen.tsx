@@ -30,6 +30,7 @@ export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = (
     const [loading, setLoading] = useState(true);
     const [totalServices, setTotalServices] = useState(0);
     const [growth, setGrowth] = useState(0);
+    const [showMonthPicker, setShowMonthPicker] = useState(false);
 
     useEffect(() => {
         console.log('useEffect triggered');
@@ -139,19 +140,92 @@ export const CompletedServicesScreen: React.FC<CompletedServicesScreenProps> = (
                 <h1 className="text-lg font-bold text-center flex-1">Serviços Realizados</h1>
                 <div className="w-8"></div>
             </div>
-            {/* Filter Section matching Dashboard */}
+            {/* Filter Section with Custom Month Picker */}
             <div className="px-4 py-4 sticky top-[65px] z-40 bg-background-light border-b border-gray-100 flex justify-end">
-                <input
-                    type="month"
-                    value={currentMonthValue}
-                    onChange={(e) => {
-                        if (e.target.value) {
-                            const [y, m] = e.target.value.split('-');
-                            handleDateChange(new Date(parseInt(y), parseInt(m) - 1, 1));
-                        }
-                    }}
-                    className="text-sm border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:ring-1 focus:ring-primary text-gray-600 shadow-sm"
-                />
+                <div className="relative">
+                    <button
+                        onClick={() => setShowMonthPicker(!showMonthPicker)}
+                        className="text-sm border border-gray-200 rounded-lg px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-primary/50 text-gray-700 shadow-sm font-medium flex items-center gap-2 hover:bg-gray-50 transition-colors"
+                    >
+                        <span className="material-symbols-outlined text-[18px]">calendar_month</span>
+                        {getCurrentMonthYear()} de {selectedDate.getFullYear()}
+                        <span className={`material-symbols-outlined text-[18px] transition-transform ${showMonthPicker ? 'rotate-180' : ''}`}>expand_more</span>
+                    </button>
+
+                    {showMonthPicker && (
+                        <>
+                            {/* Backdrop */}
+                            <div
+                                className="fixed inset-0 z-40"
+                                onClick={() => setShowMonthPicker(false)}
+                            />
+
+                            {/* Month Picker Dropdown */}
+                            <div className="absolute right-0 top-full mt-2 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden z-50 w-80">
+                                {/* Year Selector */}
+                                <div className="bg-primary px-4 py-3 flex items-center justify-between">
+                                    <button
+                                        onClick={() => handleDateChange(new Date(selectedDate.getFullYear() - 1, selectedDate.getMonth(), 1))}
+                                        className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-white">chevron_left</span>
+                                    </button>
+                                    <span className="text-white font-bold text-lg">{selectedDate.getFullYear()}</span>
+                                    <button
+                                        onClick={() => handleDateChange(new Date(selectedDate.getFullYear() + 1, selectedDate.getMonth(), 1))}
+                                        className="p-1 hover:bg-white/20 rounded-lg transition-colors"
+                                    >
+                                        <span className="material-symbols-outlined text-white">chevron_right</span>
+                                    </button>
+                                </div>
+
+                                {/* Months Grid */}
+                                <div className="p-4 grid grid-cols-3 gap-2">
+                                    {['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'].map((month, idx) => {
+                                        const isSelected = selectedDate.getMonth() === idx && selectedDate.getFullYear() === selectedDate.getFullYear();
+                                        const isCurrent = new Date().getMonth() === idx && new Date().getFullYear() === selectedDate.getFullYear();
+                                        return (
+                                            <button
+                                                key={month}
+                                                onClick={() => {
+                                                    handleDateChange(new Date(selectedDate.getFullYear(), idx, 1));
+                                                    setShowMonthPicker(false);
+                                                }}
+                                                className={`px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isSelected
+                                                        ? 'bg-primary text-white shadow-md'
+                                                        : isCurrent
+                                                            ? 'bg-primary/10 text-primary border border-primary/20'
+                                                            : 'hover:bg-gray-50 text-gray-700'
+                                                    }`}
+                                            >
+                                                {month.substring(0, 3)}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {/* Quick Actions */}
+                                <div className="border-t border-gray-100 p-3 flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            handleDateChange(new Date());
+                                            setShowMonthPicker(false);
+                                        }}
+                                        className="flex-1 px-3 py-2 text-sm font-medium text-primary hover:bg-primary/5 rounded-lg transition-colors"
+                                    >
+                                        Este mês
+                                    </button>
+                                    <button
+                                        onClick={() => setShowMonthPicker(false)}
+                                        className="flex-1 px-3 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+                                    >
+                                        Fechar
+                                    </button>
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </div>
             </div>
 
             {/* Content */}

@@ -1,6 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useAlert } from '../contexts/AlertContext';
+import { useCache } from '../contexts/CacheContext';
+import { SkeletonList, SkeletonAppointment } from './ui/Skeleton';
 
 interface ScheduleProps {
   // Lifted state props
@@ -25,6 +27,7 @@ export const Schedule: React.FC<ScheduleProps> = ({
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const { showAlert } = useAlert();
+  const { schedulesCache, setSchedulesCache, isStale } = useCache();
 
   // Calendar Modal States
 
@@ -41,6 +44,15 @@ export const Schedule: React.FC<ScheduleProps> = ({
 
   const fetchAppointments = async () => {
     try {
+      // Check cache first
+      if (schedulesCache &&
+        schedulesCache.activeTab === activeTab &&
+        !isStale(schedulesCache.lastUpdated, 3)) { // 3 minutes cache for schedules
+        setAppointments(schedulesCache.data);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
@@ -168,6 +180,7 @@ export const Schedule: React.FC<ScheduleProps> = ({
         }));
 
         setAppointments(appointmentList);
+        setSchedulesCache(appointmentList, activeTab); // Update cache
       }
     } catch (error) {
       console.error('Error loading appointments:', error);

@@ -83,11 +83,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onNavigate })
         {/* Menu Items */}
         <div className="flex-1 overflow-y-auto py-4 px-3 flex flex-col gap-1">
           <MenuItem icon="calendar_month" label="Agenda" onClick={() => onNavigate('schedule')} />
-          <MenuItem icon="build" label="Serviços" onClick={() => onNavigate('services')} />
           <MenuItem icon="group" label="Clientes" onClick={() => onNavigate('clients')} />
-          <MenuItem icon="handyman" label="Equipamentos" onClick={() => onNavigate('inventory')} />
-          <MenuItem icon="payments" label="Financeiro" onClick={() => onNavigate('finance')} />
           <MenuItem icon="request_quote" label="Orçamento" onClick={() => onNavigate('quotes')} />
+          <MenuItem icon="build" label="Catálogo de Serviços" onClick={() => onNavigate('services')} />
+          <MenuItem icon="handyman" label="Catálogo de Equipamentos" onClick={() => onNavigate('inventory')} />
+          <MenuItem icon="payments" label="Financeiro" onClick={() => onNavigate('finance')} />
           <MenuItem icon="settings" label="Ajustes" onClick={() => onNavigate('settings')} />
         </div>
 

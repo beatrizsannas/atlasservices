@@ -188,12 +188,22 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
         title = 'Agendamento Avulso';
       }
 
+
+      // Map appointmentType to database values (banco aceita valores em inglês)
+      const dbType = appointmentType === 'service' ? 'service' :
+        appointmentType === 'quote' ? 'quote' :
+          'avulso';
+
+      console.log('🔍 DEBUG - appointmentType:', appointmentType);
+      console.log('🔍 DEBUG - dbType que será enviado:', dbType);
+      console.log('🔍 DEBUG - tipo do dbType:', typeof dbType);
+
       // 1. Insert without related_id first to bypass schema cache issue
       const { data: insertedData, error: insertError } = await supabase.from('appointments').insert({
         user_id: user.id,
         client_id: selectedClient.id,
         title: title,
-        type: appointmentType,
+        // type: dbType,  // COMENTADO TEMPORARIAMENTE PARA VER ERRO
         date: selectedDate,
         start_time: `${startTime}:00`,
         end_time: `${endTime}:00`,
@@ -201,7 +211,11 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
         status: 'scheduled'
       }).select().single();
 
-      if (insertError) throw insertError;
+      if (insertError) {
+        console.error('❌ Erro detalhado:', insertError);
+        throw insertError;
+      }
+
 
       // 2. Update with related_id if needed
       if (selectedItem?.id && insertedData?.id) {
@@ -622,17 +636,27 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
                       parseInt(tempDate.split('-')[1]) === (viewDate.getMonth() + 1) &&
                       parseInt(tempDate.split('-')[0]) === viewDate.getFullYear();
 
+                    // Check if this is today
+                    const today = new Date();
+                    const isToday = dayObj.type === 'current' &&
+                      dayObj.day === today.getDate() &&
+                      viewDate.getMonth() === today.getMonth() &&
+                      viewDate.getFullYear() === today.getFullYear();
+
                     return (
                       <button
                         key={index}
                         onClick={() => handleDateSelect(dayObj.day, dayObj.type as any)}
                         className={`
-                          h-9 w-9 flex items-center justify-center rounded-full text-sm transition-colors
+                          h-9 w-9 flex items-center justify-center rounded-full text-sm transition-colors relative
                           ${dayObj.type === 'current' ? 'text-[#111418] hover:bg-gray-100' : 'text-gray-300'}
                           ${isSelected ? '!bg-primary !text-white !font-bold shadow-md' : ''}
                         `}
                       >
                         {dayObj.day}
+                        {isToday && !isSelected && (
+                          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-primary rounded-full"></div>
+                        )}
                       </button>
                     );
                   })}
@@ -650,6 +674,6 @@ export const NewAppointment: React.FC<NewAppointmentProps> = ({ onBack, initialQ
           </div>
         )}
       </div>
-    </div>
+    </div >
   );
 };
